@@ -1,0 +1,4 @@
+include lightlemma/data/*.json
+include LICENSE
+include README.md
+include pyproject.toml 

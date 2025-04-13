@@ -1,0 +1,40 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "lightlemma"
+version = "0.1.0"
+authors = [
+  { name="Sean Gao", email="seangaoxy@gmail.com" },
+]
+description = "A lightweight, fast English lemmatizer"
+readme = "README.md"
+requires-python = ">=3.8"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Topic :: Text Processing :: Linguistic",
+]
+
+[project.urls]
+"Homepage" = "https://github.com/seangao/lightlemma"
+"Bug Tracker" = "https://github.com/seangao/lightlemma/issues"
+
+[tool.hatch.build.targets.wheel]
+packages = ["lightlemma"]
+
+[tool.hatch.build.targets.wheel.sources]
+"lightlemma" = "lightlemma"
+"data" = "lightlemma/data"
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+    "black>=23.0.0",
+    "isort>=5.0.0",
+    "mypy>=1.0.0",
+    "flake8>=6.0.0"
+] 
