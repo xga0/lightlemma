@@ -1,5 +1,9 @@
 # LightLemma
 
+[![PyPI version](https://img.shields.io/pypi/v/lightlemma.svg)](https://pypi.org/project/lightlemma/)
+[![PyPI status](https://img.shields.io/pypi/status/lightlemma.svg)](https://pypi.org/project/lightlemma/)
+[![PyPI - Python Version](https://img.shields.io/pypi/pyversions/lightlemma.svg)](https://pypi.org/project/lightlemma/)
+
 A lightweight, fast English lemmatizer and stemmer. LightLemma focuses on providing high-performance text normalization for English text while maintaining a minimal footprint.
 
 ## Introduction to Lemmatization
