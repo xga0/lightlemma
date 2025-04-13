@@ -135,6 +135,12 @@ def _step3(word: str) -> str:
 
 def _step4(word: str) -> str:
     """Step 4 of the Porter Stemming Algorithm."""
+    # Handle 'um' suffix separately with its own condition
+    if word.endswith('um'):
+        stem = word[:-2]
+        if _count_vc(stem) > 0:  # Only require one vowel-consonant sequence
+            return stem
+    
     suffixes = [
         'al', 'ance', 'ence', 'er', 'ic', 'able', 'ible', 'ant', 'ement',
         'ment', 'ent', 'ion', 'ou', 'ism', 'ate', 'iti', 'ous', 'ive', 'ize'
@@ -144,8 +150,8 @@ def _step4(word: str) -> str:
         if word.endswith(suffix):
             stem = word[:-len(suffix)]
             if _count_vc(stem) > 1:
-                if suffix == 'ion' and stem[-1] in 'st':
-                    return stem
+                if suffix == 'ion' and not stem.endswith(('s', 't')):
+                    continue
                 return stem
     return word
 

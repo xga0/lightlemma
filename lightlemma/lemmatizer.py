@@ -104,6 +104,14 @@ VES_MAPPING = {
     'elves': 'elf'
 }
 
+# Words that should not be lemmatized (keep as is)
+KEEP_AS_IS = {
+    'universal', 'personal', 'general', 'special', 'natural', 'normal',
+    'formal', 'final', 'total', 'global', 'local', 'central', 'digital',
+    'national', 'international', 'professional', 'traditional', 'original',
+    'maximum', 'minimum', 'optimal', 'minimal', 'maximal'
+}
+
 def _count_syllables(word: str) -> int:
     """Count the number of syllables in a word."""
     word = word.lower()
@@ -375,7 +383,7 @@ def _apply_rules(word: str) -> str:
 
 def lemmatize(word: str) -> str:
     """
-    Lemmatize an English word to its base form.
+    Lemmatize a word to its base form.
     
     Args:
         word: The word to lemmatize.
@@ -385,9 +393,17 @@ def lemmatize(word: str) -> str:
     """
     if not word:
         return word
-    
+        
     # Convert to lowercase for processing
-    word = word.lower()
+    word = word.lower().strip()
     
+    # Check if word should be kept as is
+    if word in KEEP_AS_IS:
+        return word
+    
+    # Check irregular forms first
+    if word in IRREGULAR_FORMS:
+        return IRREGULAR_FORMS[word]
+        
     # Apply rules
     return _apply_rules(word) 
