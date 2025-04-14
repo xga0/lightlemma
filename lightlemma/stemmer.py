@@ -1,23 +1,25 @@
 """
 Porter Stemmer implementation.
 """
-from typing import Set
+from typing import Set, Dict, Optional
+from functools import lru_cache
 
 # Vowels and consonants
-VOWELS = set('aeiou')
-DOUBLE_CONSONANTS = {'bb', 'dd', 'ff', 'gg', 'mm', 'nn', 'pp', 'rr', 'tt'}
+VOWELS = frozenset('aeiou')  # Use frozenset for immutable set
+DOUBLE_CONSONANTS = frozenset(['bb', 'dd', 'ff', 'gg', 'mm', 'nn', 'pp', 'rr', 'tt'])
+SPECIAL_CONS = frozenset(['w', 'x', 'y'])  # Special consonants for _ends_cvc
 
+@lru_cache(maxsize=1024)
 def _is_vowel(char: str, word: str, index: int) -> bool:
     """Check if a character at the given index is a vowel."""
-    if char.lower() in VOWELS:
+    char_lower = char.lower()
+    if char_lower in VOWELS:
         return True
-    if char.lower() == 'y':
-        # If y is preceded by a vowel, it's a consonant; otherwise it's a vowel
-        if index == 0:
-            return True
-        return not _is_vowel(word[index - 1], word, index - 1)
+    if char_lower == 'y':
+        return index == 0 or not _is_vowel(word[index - 1], word, index - 1)
     return False
 
+@lru_cache(maxsize=1024)
 def _count_vc(word: str) -> int:
     """Count the number of vowel-consonant sequences."""
     count = 0
@@ -38,15 +40,12 @@ def _ends_cvc(word: str) -> bool:
     if not _is_vowel(word[-1], word, len(word)-1) and \
        _is_vowel(word[-2], word, len(word)-2) and \
        not _is_vowel(word[-3], word, len(word)-3):
-        # Special case: Don't count 'w', 'x', or 'y' as the final consonant
-        return word[-1].lower() not in {'w', 'x', 'y'}
+        return word[-1].lower() not in SPECIAL_CONS
     return False
 
 def _ends_double_consonant(word: str) -> bool:
     """Check if word ends in double consonant."""
-    if len(word) < 2:
-        return False
-    return word[-2:].lower() in DOUBLE_CONSONANTS
+    return len(word) >= 2 and word[-2:].lower() in DOUBLE_CONSONANTS
 
 def _step1a(word: str) -> str:
     """Step 1a of the Porter Stemming Algorithm."""
@@ -135,12 +134,6 @@ def _step3(word: str) -> str:
 
 def _step4(word: str) -> str:
     """Step 4 of the Porter Stemming Algorithm."""
-    # Handle 'um' suffix separately with its own condition
-    if word.endswith('um'):
-        stem = word[:-2]
-        if _count_vc(stem) > 0:  # Only require one vowel-consonant sequence
-            return stem
-    
     suffixes = [
         'al', 'ance', 'ence', 'er', 'ic', 'able', 'ible', 'ant', 'ement',
         'ment', 'ent', 'ion', 'ou', 'ism', 'ate', 'iti', 'ous', 'ive', 'ize'
@@ -153,6 +146,13 @@ def _step4(word: str) -> str:
                 if suffix == 'ion' and not stem.endswith(('s', 't')):
                     continue
                 return stem
+    
+    # Handle 'um' suffix last as it's less common
+    if word.endswith('um'):
+        stem = word[:-2]
+        if _count_vc(stem) > 0:
+            return stem
+            
     return word
 
 def _step5a(word: str) -> str:
@@ -180,22 +180,27 @@ def stem(word: str) -> str:
         
     Returns:
         The stemmed form of the word.
+        
+    Raises:
+        TypeError: If word is not a string
+        ValueError: If word is too long (>100 chars)
     """
+    if not isinstance(word, str):
+        raise TypeError("Input must be a string")
+    
     if not word:
         return word
+    
+    if len(word) > 100:
+        raise ValueError("Word is too long (>100 characters)")
     
     word = word.lower()
     
     if len(word) <= 2:
         return word
     
-    word = _step1a(word)
-    word = _step1b(word)
-    word = _step1c(word)
-    word = _step2(word)
-    word = _step3(word)
-    word = _step4(word)
-    word = _step5a(word)
-    word = _step5b(word)
+    # Apply steps in sequence
+    for step in [_step1a, _step1b, _step1c, _step2, _step3, _step4, _step5a, _step5b]:
+        word = step(word)
     
     return word 

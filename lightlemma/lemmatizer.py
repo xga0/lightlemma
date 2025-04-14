@@ -5,14 +5,16 @@ import json
 import os
 import re
 import logging
-from typing import Dict, Optional, Pattern, Tuple, Set
+from typing import Dict, Optional, Pattern, Tuple, Set, FrozenSet
+from functools import lru_cache
 
 # Configure logging
 logging.basicConfig(level=logging.WARNING)
 logger = logging.getLogger(__name__)
 
-# Vowels for checking syllables
-VOWELS = set('aeiou')
+# Constants
+MAX_WORD_LENGTH = 100
+VOWELS: FrozenSet[str] = frozenset('aeiou')
 
 # Compile patterns once for better performance
 PATTERNS = {
@@ -112,24 +114,10 @@ KEEP_AS_IS = {
     'maximum', 'minimum', 'optimal', 'minimal', 'maximal'
 }
 
-def _count_syllables(word: str) -> int:
-    """Count the number of syllables in a word."""
-    word = word.lower()
-    count = 0
-    prev_is_vowel = False
-    
-    for char in word:
-        is_vowel = char in VOWELS
-        if is_vowel and not prev_is_vowel:
-            count += 1
-        prev_is_vowel = is_vowel
-    
-    # Handle silent e
-    if word.endswith('e'):
-        if not word.endswith(('le', 'ie', 'ee', 'ye')):
-            count -= 1
-    
-    return max(1, count)  # Every word has at least one syllable
+# Convert mutable sets to immutable for better performance
+DOUBLE_CONSONANT_ENDINGS: FrozenSet[str] = frozenset(DOUBLE_CONSONANT_ENDINGS)
+KEEP_DOUBLE: FrozenSet[str] = frozenset(KEEP_DOUBLE)
+KEEP_AS_IS: FrozenSet[str] = frozenset(KEEP_AS_IS)
 
 def _load_irregular_forms() -> Dict[str, str]:
     """Load irregular forms from the JSON data file."""
@@ -139,15 +127,18 @@ def _load_irregular_forms() -> Dict[str, str]:
     try:
         with open(data_file, 'r', encoding='utf-8') as f:
             data = json.load(f)
-            # Flatten the dictionary and check for duplicates
             irregular_forms = {}
             seen_forms = set()
+            
+            # Pre-calculate lowercase forms
             for category, forms in data.items():
                 for form, lemma in forms.items():
-                    if form in seen_forms:
+                    form_lower = form.lower()
+                    if form_lower in seen_forms:
                         logger.warning(f"Duplicate irregular form found: {form}")
-                    seen_forms.add(form)
-                    irregular_forms[form] = lemma
+                    seen_forms.add(form_lower)
+                    irregular_forms[form_lower] = lemma.lower()
+            
             return irregular_forms
     except FileNotFoundError:
         logger.error(f"Irregular forms data file not found: {data_file}")
@@ -162,11 +153,29 @@ def _load_irregular_forms() -> Dict[str, str]:
 # Load irregular forms at module import time
 IRREGULAR_FORMS = _load_irregular_forms()
 
+@lru_cache(maxsize=1024)
+def _count_syllables(word: str) -> int:
+    """Count the number of syllables in a word."""
+    count = 0
+    prev_is_vowel = False
+    
+    for char in word:
+        is_vowel = char in VOWELS
+        if is_vowel and not prev_is_vowel:
+            count += 1
+        prev_is_vowel = is_vowel
+    
+    # Handle silent e
+    if word.endswith('e') and not word.endswith(('le', 'ie', 'ee', 'ye')):
+        count -= 1
+    
+    return max(1, count)  # Every word has at least one syllable
+
+@lru_cache(maxsize=1024)
 def _strip_double_consonants(word: str) -> str:
     """Strip double consonants at the end of the word if appropriate."""
-    if len(word) > 2:
-        if word[-2:] in DOUBLE_CONSONANT_ENDINGS and word not in KEEP_DOUBLE:
-            return word[:-1]
+    if len(word) > 2 and word[-2:] in DOUBLE_CONSONANT_ENDINGS and word not in KEEP_DOUBLE:
+        return word[:-1]
     return word
 
 def _handle_latin_plurals(word: str) -> Tuple[str, bool]:
@@ -390,20 +399,29 @@ def lemmatize(word: str) -> str:
         
     Returns:
         The lemmatized form of the word.
+        
+    Raises:
+        TypeError: If word is not a string
+        ValueError: If word is too long (>100 chars)
     """
+    if not isinstance(word, str):
+        raise TypeError("Input must be a string")
+    
     if not word:
         return word
-        
-    # Convert to lowercase for processing
+    
+    if len(word) > MAX_WORD_LENGTH:
+        raise ValueError(f"Word is too long (>{MAX_WORD_LENGTH} characters)")
+    
+    # Convert to lowercase and strip whitespace
     word = word.lower().strip()
     
-    # Check if word should be kept as is
+    # Quick checks for common cases
     if word in KEEP_AS_IS:
         return word
     
-    # Check irregular forms first
     if word in IRREGULAR_FORMS:
         return IRREGULAR_FORMS[word]
-        
+    
     # Apply rules
     return _apply_rules(word) 

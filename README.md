@@ -1,7 +1,6 @@
 # LightLemma
 
 [![PyPI version](https://img.shields.io/pypi/v/lightlemma.svg)](https://pypi.org/project/lightlemma/)
-[![PyPI status](https://img.shields.io/pypi/status/lightlemma.svg)](https://pypi.org/project/lightlemma/)
 [![PyPI - Python Version](https://img.shields.io/pypi/pyversions/lightlemma.svg)](https://pypi.org/project/lightlemma/)
 
 A lightweight, fast English lemmatizer and stemmer. LightLemma focuses on providing high-performance text normalization for English text while maintaining a minimal footprint.
@@ -16,7 +15,7 @@ Lemmatization is the process of reducing words to their base or dictionary form 
 
 Unlike stemming, lemmatization considers the context and part of speech of words to produce linguistically valid results. It uses a dictionary-based approach to ensure the output is always a real word.
 
-## The Difference Between Simple Lemmatization and Stemming
+## The Difference Between Lemmatization and Stemming
 
 While both lemmatization and stemming aim to reduce words to their base form, they work differently:
 
