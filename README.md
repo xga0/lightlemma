@@ -107,7 +107,15 @@ print(stemmed_tokens)  # Output: ["the", "cat", "are", "run", "faster", "than", 
 
 # Direct conversion with custom tokenizer options
 lemmatized_tokens = text_to_lemmas(text, {"preserve_case": True})
-print(lemmatized_tokens)  # Output with preserved case
+print(lemmatized_tokens)  # Output: ["the", "cat", "be", "run", "fast", "than", "dog"]
+
+# Direct conversion with case preservation after lemmatization
+lemmatized_tokens = text_to_lemmas(text, preserve_original_case=True)
+print(lemmatized_tokens)  # Output: ["The", "Cat", "Be", "Run", "Fast", "Than", "Dog"]
+
+# Direct conversion with case preservation after stemming
+stemmed_tokens = text_to_stems("The RUNNING cats", preserve_original_case=True)
+print(stemmed_tokens)  # Output: ["The", "RUN", "Cat"]
 ```
 
 ## Tokenization Options
@@ -125,10 +133,15 @@ The tokenizer provides several options for customizing the tokenization process:
 
 LightLemma provides convenient functions that process text directly to normalized tokens in a single step:
 
-- **text_to_lemmas(text, tokenizer_options=None)**: Converts raw text directly to lemmatized tokens
-- **text_to_stems(text, tokenizer_options=None)**: Converts raw text directly to stemmed tokens
+- **text_to_lemmas(text, tokenizer_options=None, preserve_original_case=False)**: Converts raw text directly to lemmatized tokens
+- **text_to_stems(text, tokenizer_options=None, preserve_original_case=False)**: Converts raw text directly to stemmed tokens
 
-These functions accept an optional dictionary of tokenizer options that can be used to customize the tokenization process before applying lemmatization or stemming.
+These functions accept the following parameters:
+- **text**: The input text to process
+- **tokenizer_options**: Optional dictionary of tokenizer settings for customizing tokenization
+- **preserve_original_case**: If True, maintains the original case pattern of tokens after lemmatization/stemming
+
+The case preservation feature allows you to maintain the original capitalization of words even after they've been lemmatized or stemmed. This is particularly useful for proper nouns, title case text, or when you need to preserve the original formatting of the text.
 
 ## Performance
 

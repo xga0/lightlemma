@@ -104,9 +104,16 @@ class TestTokenizer(unittest.TestCase):
         
         # Test with custom tokenizer options
         result = text_to_lemmas(text, {"preserve_case": True})
-        # Only check a subset since we're just testing the options are passed correctly
-        self.assertTrue(any(token.isupper() for token in result) or 
-                        any(token[0].isupper() for token in result))
+        # Case should still be lowercased since lemmatize() lowercases
+        self.assertEqual(result, expected)
+        
+        # Test with preserve_original_case
+        result = text_to_lemmas(text, preserve_original_case=True)
+        # First word should be capitalized
+        self.assertEqual(result[0], "The")
+        # Others should maintain appropriate case
+        self.assertEqual(result[1], "Cat")  # "cats" -> "Cat"
+        self.assertEqual(result[2], "Be")   # "are" -> "Be"
     
     def test_text_to_stems(self):
         """Test direct text to stems conversion."""
@@ -118,11 +125,19 @@ class TestTokenizer(unittest.TestCase):
         self.assertIn("interest", result)
         self.assertIn("result", result)
         
-        # Test with custom tokenizer options
-        result = text_to_stems(text, {"preserve_case": True})
-        # Check that case is preserved
-        self.assertTrue(any(token.isupper() for token in result) or 
-                        any(token[0].isupper() for token in result))
+        # Test with preserve_original_case
+        result = text_to_stems(text, preserve_original_case=True)
+        # First word should be capitalized
+        self.assertEqual(result[0], "The")
+        # Check that other words maintain appropriate case
+        self.assertEqual(result[1], "Studi")  # "Studies" -> "Studi"
+        
+        # Test with mixed-case words
+        text = "CamelCase UPPERCASE lowercase"
+        result = text_to_stems(text, preserve_original_case=True)
+        self.assertEqual(result[0], "Camelcas")  # "CamelCase" -> "Camelcas"
+        self.assertEqual(result[1], "UPPERCAS") # "UPPERCASE" -> "UPPERCAS"
+        self.assertEqual(result[2], "lowercas") # "lowercase" -> "lowercas"
 
 if __name__ == "__main__":
     unittest.main() 

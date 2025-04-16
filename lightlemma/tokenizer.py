@@ -149,7 +149,7 @@ def tokenize_cached(text: str) -> List[str]:
 
 
 # Chain functions for combined tokenization and normalization
-def text_to_lemmas(text: str, tokenizer_options: Optional[dict] = None) -> List[str]:
+def text_to_lemmas(text: str, tokenizer_options: Optional[dict] = None, preserve_original_case: bool = False) -> List[str]:
     """
     Process text directly to lemmatized tokens in one step.
     
@@ -161,6 +161,9 @@ def text_to_lemmas(text: str, tokenizer_options: Optional[dict] = None) -> List[
         text: The text to process.
         tokenizer_options: Optional dictionary of tokenizer settings.
             Can include any of the Tokenizer class constructor parameters.
+        preserve_original_case: If True, will attempt to preserve the original case
+            pattern of each token after lemmatization. Note that this is an approximation
+            as lemmatization can change word length.
             
     Returns:
         A list of lemmatized tokens from the text.
@@ -173,12 +176,42 @@ def text_to_lemmas(text: str, tokenizer_options: Optional[dict] = None) -> List[
     if tokenizer_options is None:
         tokenizer_options = {}
     
-    tokenizer = Tokenizer(**tokenizer_options)
+    # Make a copy to avoid modifying the original
+    options = dict(tokenizer_options)
+    
+    # Always preserve case during tokenization if we want to preserve it after lemmatization
+    if preserve_original_case and 'preserve_case' not in options:
+        options['preserve_case'] = True
+    
+    tokenizer = Tokenizer(**options)
     tokens = tokenizer.tokenize(text)
-    return [lemmatize(token) for token in tokens]
+    
+    # Store original case pattern if needed
+    if preserve_original_case:
+        result = []
+        for token in tokens:
+            lemma = lemmatize(token.lower())
+            # Try to apply original capitalization pattern
+            if token.isupper():
+                # All uppercase
+                result.append(lemma.upper())
+            elif token[0].isupper() and token[1:].islower():
+                # Capitalized
+                result.append(lemma.capitalize())
+            elif token[0].isupper():
+                # First letter uppercase, but not all lowercase after
+                # (e.g. "CamelCase") - just capitalize in this case
+                result.append(lemma.capitalize())
+            else:
+                # Keep lowercase
+                result.append(lemma)
+        return result
+    else:
+        # Standard processing - lemmatize all tokens
+        return [lemmatize(token) for token in tokens]
 
 
-def text_to_stems(text: str, tokenizer_options: Optional[dict] = None) -> List[str]:
+def text_to_stems(text: str, tokenizer_options: Optional[dict] = None, preserve_original_case: bool = False) -> List[str]:
     """
     Process text directly to stemmed tokens in one step.
     
@@ -190,6 +223,9 @@ def text_to_stems(text: str, tokenizer_options: Optional[dict] = None) -> List[s
         text: The text to process.
         tokenizer_options: Optional dictionary of tokenizer settings.
             Can include any of the Tokenizer class constructor parameters.
+        preserve_original_case: If True, will attempt to preserve the original case
+            pattern of each token after stemming. Note that this is an approximation
+            as stemming can change word length.
             
     Returns:
         A list of stemmed tokens from the text.
@@ -202,6 +238,36 @@ def text_to_stems(text: str, tokenizer_options: Optional[dict] = None) -> List[s
     if tokenizer_options is None:
         tokenizer_options = {}
     
-    tokenizer = Tokenizer(**tokenizer_options)
+    # Make a copy to avoid modifying the original
+    options = dict(tokenizer_options)
+    
+    # Always preserve case during tokenization if we want to preserve it after stemming
+    if preserve_original_case and 'preserve_case' not in options:
+        options['preserve_case'] = True
+    
+    tokenizer = Tokenizer(**options)
     tokens = tokenizer.tokenize(text)
-    return [stem(token) for token in tokens] 
+    
+    # Store original case pattern if needed
+    if preserve_original_case:
+        result = []
+        for token in tokens:
+            stemmed = stem(token.lower())
+            # Try to apply original capitalization pattern
+            if token.isupper():
+                # All uppercase
+                result.append(stemmed.upper())
+            elif token[0].isupper() and token[1:].islower():
+                # Capitalized
+                result.append(stemmed.capitalize())
+            elif token[0].isupper():
+                # First letter uppercase, but not all lowercase after
+                # (e.g. "CamelCase") - just capitalize in this case
+                result.append(stemmed.capitalize())
+            else:
+                # Keep lowercase
+                result.append(stemmed)
+        return result
+    else:
+        # Standard processing - stem all tokens
+        return [stem(token) for token in tokens] 
