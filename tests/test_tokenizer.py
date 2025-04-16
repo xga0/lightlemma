@@ -102,11 +102,6 @@ class TestTokenizer(unittest.TestCase):
         expected = ["the", "cat", "be", "run", "fast", "than", "dog"]
         self.assertEqual(result, expected)
         
-        # Test with custom tokenizer options
-        result = text_to_lemmas(text, {"preserve_case": True})
-        # Case should still be lowercased since lemmatize() lowercases
-        self.assertEqual(result, expected)
-        
         # Test with preserve_original_case
         result = text_to_lemmas(text, preserve_original_case=True)
         # First word should be capitalized

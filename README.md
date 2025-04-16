@@ -105,17 +105,13 @@ print(lemmatized_tokens)  # Output: ["the", "cat", "be", "run", "fast", "than", 
 stemmed_tokens = text_to_stems(text)
 print(stemmed_tokens)  # Output: ["the", "cat", "are", "run", "faster", "than", "dog"]
 
-# Direct conversion with custom tokenizer options
-lemmatized_tokens = text_to_lemmas(text, {"preserve_case": True})
-print(lemmatized_tokens)  # Output: ["the", "cat", "be", "run", "fast", "than", "dog"]
-
 # Direct conversion with case preservation after lemmatization
 lemmatized_tokens = text_to_lemmas(text, preserve_original_case=True)
-print(lemmatized_tokens)  # Output: ["The", "Cat", "Be", "Run", "Fast", "Than", "Dog"]
+print(lemmatized_tokens)  # Output: ["The", "cat", "be", "run", "fast", "than", "dog"]
 
 # Direct conversion with case preservation after stemming
 stemmed_tokens = text_to_stems("The RUNNING cats", preserve_original_case=True)
-print(stemmed_tokens)  # Output: ["The", "RUN", "Cat"]
+print(stemmed_tokens)  # Output: ["The", "RUN", "cat"]
 ```
 
 ## Tokenization Options

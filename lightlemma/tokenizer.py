@@ -176,20 +176,25 @@ def text_to_lemmas(text: str, tokenizer_options: Optional[dict] = None, preserve
     if tokenizer_options is None:
         tokenizer_options = {}
     
-    # Make a copy to avoid modifying the original
-    options = dict(tokenizer_options)
+    # Create tokenizer with provided options
+    tokenizer = Tokenizer(**tokenizer_options)
     
-    # Always preserve case during tokenization if we want to preserve it after lemmatization
-    if preserve_original_case and 'preserve_case' not in options:
-        options['preserve_case'] = True
-    
-    tokenizer = Tokenizer(**options)
-    tokens = tokenizer.tokenize(text)
-    
-    # Store original case pattern if needed
+    # For case preservation, we need a separate tokenizer that preserves case
     if preserve_original_case:
+        case_preserving_tokenizer = Tokenizer(
+            pattern=tokenizer.pattern,
+            preserve_case=True,  # Always preserve case for reapplying later
+            preserve_urls=tokenizer.preserve_urls,
+            preserve_emails=tokenizer.preserve_emails,
+            preserve_numbers=tokenizer.preserve_numbers,
+            preserve_punctuation=tokenizer.preserve_punctuation
+        )
+        # Get tokens with case preserved
+        tokens_with_case = case_preserving_tokenizer.tokenize(text)
+        
+        # Lemmatize and reapply original case
         result = []
-        for token in tokens:
+        for token in tokens_with_case:
             lemma = lemmatize(token.lower())
             # Try to apply original capitalization pattern
             if token.isupper():
@@ -207,7 +212,8 @@ def text_to_lemmas(text: str, tokenizer_options: Optional[dict] = None, preserve
                 result.append(lemma)
         return result
     else:
-        # Standard processing - lemmatize all tokens
+        # Standard processing without case preservation
+        tokens = tokenizer.tokenize(text)
         return [lemmatize(token) for token in tokens]
 
 
@@ -238,20 +244,25 @@ def text_to_stems(text: str, tokenizer_options: Optional[dict] = None, preserve_
     if tokenizer_options is None:
         tokenizer_options = {}
     
-    # Make a copy to avoid modifying the original
-    options = dict(tokenizer_options)
+    # Create tokenizer with provided options
+    tokenizer = Tokenizer(**tokenizer_options)
     
-    # Always preserve case during tokenization if we want to preserve it after stemming
-    if preserve_original_case and 'preserve_case' not in options:
-        options['preserve_case'] = True
-    
-    tokenizer = Tokenizer(**options)
-    tokens = tokenizer.tokenize(text)
-    
-    # Store original case pattern if needed
+    # For case preservation, we need a separate tokenizer that preserves case
     if preserve_original_case:
+        case_preserving_tokenizer = Tokenizer(
+            pattern=tokenizer.pattern,
+            preserve_case=True,  # Always preserve case for reapplying later
+            preserve_urls=tokenizer.preserve_urls,
+            preserve_emails=tokenizer.preserve_emails,
+            preserve_numbers=tokenizer.preserve_numbers,
+            preserve_punctuation=tokenizer.preserve_punctuation
+        )
+        # Get tokens with case preserved
+        tokens_with_case = case_preserving_tokenizer.tokenize(text)
+        
+        # Stem and reapply original case
         result = []
-        for token in tokens:
+        for token in tokens_with_case:
             stemmed = stem(token.lower())
             # Try to apply original capitalization pattern
             if token.isupper():
@@ -269,5 +280,6 @@ def text_to_stems(text: str, tokenizer_options: Optional[dict] = None, preserve_
                 result.append(stemmed)
         return result
     else:
-        # Standard processing - stem all tokens
+        # Standard processing without case preservation
+        tokens = tokenizer.tokenize(text)
         return [stem(token) for token in tokens] 
