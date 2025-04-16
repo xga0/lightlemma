@@ -125,6 +125,19 @@ The tokenizer provides several options for customizing the tokenization process:
 - **preserve_numbers**: Whether to keep numbers as tokens
 - **preserve_punctuation**: Whether to include punctuation as separate tokens
 
+### Token Positioning Behavior
+
+The tokenizer processes different token types in a specific order, which affects their position in the final token list:
+
+| Option | Default | Description | Position in Result |
+|--------|---------|-------------|-------------------|
+| `preserve_urls` | `False` | Keeps URLs as single tokens instead of breaking them into components | **Beginning** of token list |
+| `preserve_emails` | `False` | Keeps email addresses as single tokens | After URLs, before words |
+| `preserve_numbers` | `True` | Includes numeric tokens in the output | In their original position among words |
+| `preserve_punctuation` | `False` | Includes punctuation marks as separate tokens | **End** of token list |
+
+This ordering is optimized for common NLP tasks where token type categorization is more important than preserving the exact original sequence. For example, `"Hello, world!"` with `preserve_punctuation=True` would tokenize to `["hello", "world", ",", "!"]`, with punctuation at the end.
+
 ## Text Processing Pipeline Functions
 
 LightLemma provides convenient functions that process text directly to normalized tokens in a single step:
