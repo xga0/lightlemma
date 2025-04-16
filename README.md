@@ -39,6 +39,7 @@ Choose lemmatization when you need linguistically accurate results, and stemming
 
 - Fast and lightweight English lemmatization
 - Porter Stemmer implementation
+- Flexible tokenization functionality
 - Simple, easy-to-use API
 - No external dependencies
 - Optimized for performance
@@ -53,7 +54,8 @@ pip install lightlemma
 ## Usage
 
 ```python
-from lightlemma import lemmatize, stem
+from lightlemma import lemmatize, stem, tokenize, Tokenizer
+from lightlemma import text_to_lemmas, text_to_stems
 
 # Simple word lemmatization
 word = "running"
@@ -76,7 +78,57 @@ lemmas = [lemmatize(word) for word in words]
 stems = [stem(word) for word in words]
 print(lemmas)  # Output: ["study", "universal", "maximum"]
 print(stems)   # Output: ["studi", "univers", "maxim"]
+
+# Using the tokenizer
+text = "This is a simple example of tokenization!"
+tokens = tokenize(text)
+print(tokens)  # Output: ["this", "is", "a", "simple", "example", "of", "tokenization"]
+
+# Advanced tokenization with custom options
+tokenizer = Tokenizer(preserve_case=True, preserve_punctuation=True)
+custom_tokens = tokenizer.tokenize(text)
+print(custom_tokens)  # Output: ["This", "is", "a", "simple", "example", "of", "tokenization", "!"]
+
+# Complete text processing pipeline - manual approach
+text = "The cats are running faster than dogs."
+tokens = tokenize(text)
+lemmas = [lemmatize(token) for token in tokens]
+print(lemmas)  # Output: ["the", "cat", "be", "run", "fast", "than", "dog"]
+
+# Using direct text-to-normalized-tokens functions
+text = "The cats are running faster than dogs."
+# Convert text directly to lemmatized tokens in one step
+lemmatized_tokens = text_to_lemmas(text)
+print(lemmatized_tokens)  # Output: ["the", "cat", "be", "run", "fast", "than", "dog"]
+
+# Convert text directly to stemmed tokens in one step
+stemmed_tokens = text_to_stems(text)
+print(stemmed_tokens)  # Output: ["the", "cat", "are", "run", "faster", "than", "dog"]
+
+# Direct conversion with custom tokenizer options
+lemmatized_tokens = text_to_lemmas(text, {"preserve_case": True})
+print(lemmatized_tokens)  # Output with preserved case
 ```
+
+## Tokenization Options
+
+The tokenizer provides several options for customizing the tokenization process:
+
+- **pattern**: Custom regex pattern for tokenization
+- **preserve_case**: Whether to preserve case of tokens
+- **preserve_urls**: Whether to keep URLs as single tokens
+- **preserve_emails**: Whether to keep email addresses as single tokens 
+- **preserve_numbers**: Whether to keep numbers as tokens
+- **preserve_punctuation**: Whether to include punctuation as separate tokens
+
+## Text Processing Pipeline Functions
+
+LightLemma provides convenient functions that process text directly to normalized tokens in a single step:
+
+- **text_to_lemmas(text, tokenizer_options=None)**: Converts raw text directly to lemmatized tokens
+- **text_to_stems(text, tokenizer_options=None)**: Converts raw text directly to stemmed tokens
+
+These functions accept an optional dictionary of tokenizer options that can be used to customize the tokenization process before applying lemmatization or stemming.
 
 ## Performance
 

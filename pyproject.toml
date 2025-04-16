@@ -24,8 +24,8 @@ classifiers = [
 ]
 
 [project.urls]
-"Homepage" = "https://github.com/seangao/lightlemma"
-"Bug Tracker" = "https://github.com/seangao/lightlemma/issues"
+"Homepage" = "https://github.com/xga0/lightlemma"
+"Bug Tracker" = "https://github.com/xga0/lightlemma/issues"
 
 [tool.hatch.build.targets.wheel]
 packages = ["lightlemma"]
