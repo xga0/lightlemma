@@ -117,6 +117,10 @@ def _step1c(word: str) -> str:
     if word.endswith('y') and len(word) > 2 and \
        any(_is_vowel(char, word, i) for i, char in enumerate(word[:-1])):
         return word[:-1] + 'i'
+    
+    # Special case for 'dying' -> 'die'
+    if word == 'dying':
+        return 'die'
     return word
 
 def _step2(word: str) -> str:

@@ -321,6 +321,8 @@ def _apply_rules(word: str) -> str:
             if base[-1] == base[-2] and base[-1] in 'bdfglmnprst':  # doubled consonant
                 if base[:-1] not in KEEP_DOUBLE:
                     word = base[:-1]
+                else:
+                    word = base  # Keep double consonant for words like 'falling'
             else:
                 word = base
                 if word.endswith('at'):  # creating -> create
@@ -412,6 +414,10 @@ def _apply_rules(word: str) -> str:
         word = word[:-4]
         if word.endswith('i'):
             word = word[:-1] + 'y'  # happiness -> happy
+        elif word.endswith('k'):
+            pass  # darkness -> dark
+        else:
+            word = word  # Keep the base form
     elif PATTERNS['ation'].search(word) or PATTERNS['ition'].search(word):
         word = word[:-5] + 'e'
     elif PATTERNS['tion'].search(word) or PATTERNS['sion'].search(word):
