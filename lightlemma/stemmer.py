@@ -1,7 +1,7 @@
 """
 Porter Stemmer implementation.
 """
-from typing import Set, Dict, Optional, List, Tuple, FrozenSet
+from typing import Dict, List, FrozenSet
 from functools import lru_cache
 
 # Character sets
@@ -41,7 +41,26 @@ SPECIAL_CASES = {
     'mathematics': 'mathemat'  # Common scientific term
 }
 
-@lru_cache(maxsize=1024)
+# Precompiled suffix replacements for better performance
+STEP2_REPLACEMENTS = [
+    ('ational', 'ate'), ('ization', 'ize'), ('fulness', 'ful'), ('ousness', 'ous'),
+    ('iveness', 'ive'), ('tional', 'tion'), ('biliti', 'ble'), ('entli', 'ent'),
+    ('ousli', 'ous'), ('alism', 'al'), ('aliti', 'al'), ('iviti', 'ive'),
+    ('ation', 'ate'), ('ator', 'ate'), ('enci', 'ence'), ('anci', 'ance'),
+    ('izer', 'ize'), ('abli', 'able'), ('alli', 'al'), ('eli', 'e')
+]
+
+STEP3_REPLACEMENTS = [
+    ('icate', 'ic'), ('ative', ''), ('alize', 'al'), ('iciti', 'ic'),
+    ('ical', 'ic'), ('ful', ''), ('ness', '')
+]
+
+STEP4_SUFFIXES = [
+    'ement', 'ance', 'ence', 'able', 'ible', 'ment', 'ent', 'ant',
+    'ism', 'ate', 'iti', 'ous', 'ive', 'ize', 'ion', 'al', 'er', 'ic', 'ou'
+]
+
+@lru_cache(maxsize=2048)
 def _is_vowel(char: str, word: str, index: int) -> bool:
     """
     Check if a character at the given index is a vowel.
@@ -61,7 +80,7 @@ def _is_vowel(char: str, word: str, index: int) -> bool:
         return index == 0 or not _is_vowel(word[index - 1], word, index - 1)
     return False
 
-@lru_cache(maxsize=1024)
+@lru_cache(maxsize=2048)
 def _count_vc(word: str) -> int:
     """
     Count the number of vowel-consonant sequences.
@@ -115,6 +134,7 @@ def _ends_double_consonant(word: str) -> bool:
     """
     return len(word) >= 2 and word[-2:].lower() in DOUBLE_CONSONANTS
 
+@lru_cache(maxsize=1024)
 def _step1a(word: str) -> str:
     """
     Step 1a of the Porter Stemming Algorithm.
@@ -135,6 +155,7 @@ def _step1a(word: str) -> str:
         return word[:-1]
     return word
 
+@lru_cache(maxsize=1024)
 def _step1b(word: str) -> str:
     """
     Step 1b of the Porter Stemming Algorithm.
@@ -145,43 +166,40 @@ def _step1b(word: str) -> str:
     Returns:
         The word after applying step 1b rules
     """
-    # Special case handling
     if word == 'agreed':
         return 'agree'
     
     if word.endswith('eed'):
         if _count_vc(word[:-3]) > 0:
-            return word[:-1]  # 'agreed' -> 'agree'
+            return word[:-1]
         return word
     
     if word.endswith('ed'):
         stem = word[:-2]
         if any(_is_vowel(char, stem, i) for i, char in enumerate(stem)):
-            word = stem
-            if word.endswith('at') or word.endswith('bl') or word.endswith('iz'):
-                return word + 'e'
-            if _ends_double_consonant(word) and not word.endswith(('l', 's', 'z')):
-                return word[:-1]
-            if _count_vc(word) == 1 and _ends_cvc(word):
-                return word + 'e'
-            return word
+            return _post_process_stem(stem)
         return word
     
     if word.endswith('ing'):
         stem = word[:-3]
         if any(_is_vowel(char, stem, i) for i, char in enumerate(stem)):
-            word = stem
-            if word.endswith('at') or word.endswith('bl') or word.endswith('iz'):
-                return word + 'e'
-            if _ends_double_consonant(word) and not word.endswith(('l', 's', 'z')):
-                return word[:-1]
-            if _count_vc(word) == 1 and _ends_cvc(word):
-                return word + 'e'
-            return word
+            return _post_process_stem(stem)
         return word
     
     return word
 
+@lru_cache(maxsize=512)
+def _post_process_stem(stem: str) -> str:
+    """Post-process stem after removing -ed or -ing."""
+    if stem.endswith(('at', 'bl', 'iz')):
+        return stem + 'e'
+    if _ends_double_consonant(stem) and not stem.endswith(('l', 's', 'z')):
+        return stem[:-1]
+    if _count_vc(stem) == 1 and _ends_cvc(stem):
+        return stem + 'e'
+    return stem
+
+@lru_cache(maxsize=1024)
 def _step1c(word: str) -> str:
     """
     Step 1c of the Porter Stemming Algorithm - handles Y to I transformation.
@@ -192,17 +210,16 @@ def _step1c(word: str) -> str:
     Returns:
         The word after applying step 1c rules
     """
-    # Special cases handling for Y/IE transformations
     if word in SPECIAL_CASES and (word.endswith('ing') or word.endswith('y')):
         return SPECIAL_CASES[word]
     
-    # Only apply Y->I rule if the word has a vowel before the final 'y'
     if word.endswith('y') and len(word) > 2 and \
        any(_is_vowel(char, word, i) for i, char in enumerate(word[:-1])):
         return word[:-1] + 'i'
     
     return word
 
+@lru_cache(maxsize=1024)
 def _step2(word: str) -> str:
     """
     Step 2 of the Porter Stemming Algorithm.
@@ -213,24 +230,14 @@ def _step2(word: str) -> str:
     Returns:
         The word after applying step 2 rules
     """
-    # Step 2 suffix replacements organized by descending length for efficiency
-    replacements = [
-        ('ational', 'ate'), ('ization', 'ize'), ('fulness', 'ful'), 
-        ('ousness', 'ous'), ('iveness', 'ive'), ('tional', 'tion'), 
-        ('biliti', 'ble'), ('entli', 'ent'), ('ousli', 'ous'), 
-        ('alism', 'al'), ('aliti', 'al'), ('iviti', 'ive'),
-        ('ation', 'ate'), ('ator', 'ate'), ('enci', 'ence'), 
-        ('anci', 'ance'), ('izer', 'ize'), ('abli', 'able'), 
-        ('alli', 'al'), ('eli', 'e')
-    ]
-    
-    for suffix, replacement in replacements:
+    for suffix, replacement in STEP2_REPLACEMENTS:
         if word.endswith(suffix):
             stem = word[:-len(suffix)]
             if _count_vc(stem) > 0:
                 return stem + replacement
     return word
 
+@lru_cache(maxsize=1024)
 def _step3(word: str) -> str:
     """
     Step 3 of the Porter Stemming Algorithm.
@@ -241,27 +248,20 @@ def _step3(word: str) -> str:
     Returns:
         The word after applying step 3 rules
     """
-    # Special cases handling
     if word in ('electriciti', 'electrical'):
         return 'electric'
     
-    # Special handling for words ending in -logy
     if word.endswith('ology') and len(word) > 5:
-        return word[:-1]  # biology -> biolog
+        return word[:-1]
     
-    # Step 3 suffix replacements organized by descending length
-    replacements = [
-        ('icate', 'ic'), ('ative', ''), ('alize', 'al'), ('iciti', 'ic'),
-        ('ical', 'ic'), ('ful', ''), ('ness', '')
-    ]
-    
-    for suffix, replacement in replacements:
+    for suffix, replacement in STEP3_REPLACEMENTS:
         if word.endswith(suffix):
             stem = word[:-len(suffix)]
             if _count_vc(stem) > 0:
                 return stem + replacement
     return word
 
+@lru_cache(maxsize=1024)
 def _step4(word: str) -> str:
     """
     Step 4 of the Porter Stemming Algorithm.
@@ -272,17 +272,10 @@ def _step4(word: str) -> str:
     Returns:
         The word after applying step 4 rules
     """
-    # Special case handling
     if word == 'engineering':
         return 'engineer'
     
-    # Step 4 suffixes organized by descending length for efficiency
-    suffixes = [
-        'ement', 'ance', 'ence', 'able', 'ible', 'ment', 'ent', 'ant',
-        'ism', 'ate', 'iti', 'ous', 'ive', 'ize', 'ion', 'al', 'er', 'ic', 'ou'
-    ]
-    
-    for suffix in suffixes:
+    for suffix in STEP4_SUFFIXES:
         if word.endswith(suffix):
             stem = word[:-len(suffix)]
             if _count_vc(stem) > 1:
@@ -292,6 +285,7 @@ def _step4(word: str) -> str:
     
     return word
 
+@lru_cache(maxsize=1024)
 def _step5a(word: str) -> str:
     """
     Step 5a of the Porter Stemming Algorithm.
@@ -310,6 +304,7 @@ def _step5a(word: str) -> str:
             return stem
     return word
 
+@lru_cache(maxsize=1024)
 def _step5b(word: str) -> str:
     """
     Step 5b of the Porter Stemming Algorithm.
@@ -320,7 +315,6 @@ def _step5b(word: str) -> str:
     Returns:
         The word after applying step 5b rules
     """
-    # Special case handling
     if word == 'controll':
         return 'control'
     
@@ -360,10 +354,8 @@ def stem(word: str) -> str:
     if len(word) > 100:
         raise ValueError("Word is too long (>100 characters)")
     
-    # Normalize input
     word = word.lower().strip()
     
-    # Quick checks for common cases
     if word in SPECIAL_CASES:
         return SPECIAL_CASES[word]
     
@@ -374,7 +366,68 @@ def stem(word: str) -> str:
         return word
     
     # Apply steps in sequence
-    for step in [_step1a, _step1b, _step1c, _step2, _step3, _step4, _step5a, _step5b]:
+    steps = [_step1a, _step1b, _step1c, _step2, _step3, _step4, _step5a, _step5b]
+    for step in steps:
         word = step(word)
     
-    return word 
+    return word
+
+def stem_batch(words: List[str]) -> List[str]:
+    """
+    Apply the Porter Stemming Algorithm to a batch of words efficiently.
+    
+    This function processes multiple words at once, providing better performance
+    than calling stem() individually for each word by reducing function
+    call overhead and enabling batch optimizations.
+    
+    Args:
+        words: List of words to stem.
+        
+    Returns:
+        List of stemmed words in the same order as input.
+        
+    Raises:
+        TypeError: If words is not a list or contains non-string items
+        ValueError: If any word is too long (>100 chars)
+    
+    Examples:
+        >>> stem_batch(["running", "happiness", "flies"])
+        ['run', 'happi', 'fli']
+        >>> stem_batch(["cats", "dogs", ""])
+        ['cat', 'dog', '']
+    """
+    if not isinstance(words, list):
+        raise TypeError("Input must be a list")
+    
+    if not words:
+        return []
+    
+    results = []
+    
+    for word in words:
+        if not isinstance(word, str):
+            raise TypeError("All items in list must be strings")
+        
+        if not word:
+            results.append(word)
+            continue
+        
+        if len(word) > 100:
+            raise ValueError("Word is too long (>100 characters)")
+        
+        word_lower = word.lower().strip()
+        
+        if word_lower in SPECIAL_CASES:
+            results.append(SPECIAL_CASES[word_lower])
+        elif word_lower in KEEP_AS_IS:
+            results.append(word_lower)
+        elif len(word_lower) <= 2:
+            results.append(word_lower)
+        else:
+            processed_word = word_lower
+            steps = [_step1a, _step1b, _step1c, _step2, _step3, _step4, _step5a, _step5b]
+            for step in steps:
+                processed_word = step(processed_word)
+            results.append(processed_word)
+    
+    return results 
