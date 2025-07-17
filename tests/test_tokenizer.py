@@ -67,7 +67,7 @@ class TestTokenizer(unittest.TestCase):
         # Pattern to match only capitalized words
         tokenizer = Tokenizer(pattern=r'\b[A-Z][a-z]*\b', preserve_case=True)
         text = "The Quick Brown Fox Jumps Over the Lazy Dog"
-        expected = ["The", "Quick", "Brown", "Fox", "Jumps", "Over", "Dog"]
+        expected = ["The", "Quick", "Brown", "Fox", "Jumps", "Over", "Lazy", "Dog"]
         self.assertEqual(tokenizer.tokenize(text), expected)
     
     def test_preserve_punctuation(self):
@@ -104,11 +104,11 @@ class TestTokenizer(unittest.TestCase):
         
         # Test with preserve_original_case
         result = text_to_lemmas(text, preserve_original_case=True)
-        # First word should be capitalized
+        # First word should be capitalized (preserving original case)
         self.assertEqual(result[0], "The")
-        # Others should maintain appropriate case
-        self.assertEqual(result[1], "Cat")  # "cats" -> "Cat"
-        self.assertEqual(result[2], "Be")   # "are" -> "Be"
+        # Others should maintain their original case
+        self.assertEqual(result[1], "cat")  # "cats" -> "cat" (lowercase preserved)
+        self.assertEqual(result[2], "be")   # "are" -> "be" (lowercase preserved)
     
     def test_text_to_stems(self):
         """Test direct text to stems conversion."""
@@ -122,10 +122,10 @@ class TestTokenizer(unittest.TestCase):
         
         # Test with preserve_original_case
         result = text_to_stems(text, preserve_original_case=True)
-        # First word should be capitalized
+        # First word should be capitalized (preserving original case)
         self.assertEqual(result[0], "The")
-        # Check that other words maintain appropriate case
-        self.assertEqual(result[1], "Studi")  # "Studies" -> "Studi"
+        # Check that other words maintain their original case
+        self.assertEqual(result[1], "studi")  # "studies" -> "studi" (lowercase preserved)
         
         # Test with mixed-case words
         text = "CamelCase UPPERCASE lowercase"

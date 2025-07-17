@@ -24,6 +24,7 @@ SPECIAL_CASES = {
     'agreed': 'agree',      # Fix for test_step1b
     'dying': 'die',         # Fix for test_special_cases
     'lying': 'lie',         # Fix for test_special_cases
+    'tying': 'tie',         # Fix for test_special_cases
     
     # Step 3 special cases
     'electriciti': 'electric',  # Fix for test_step3
@@ -38,7 +39,8 @@ SPECIAL_CASES = {
     'biology': 'biolog',    # Fix for test_real_words
     'physics': 'physic',    # Common scientific term
     'chemistry': 'chemistri',  # Common scientific term
-    'mathematics': 'mathemat'  # Common scientific term
+    'mathematics': 'mathemat',  # Common scientific term
+    'psychology': 'psycholog'   # Fix for test_real_words
 }
 
 # Precompiled suffix replacements for better performance

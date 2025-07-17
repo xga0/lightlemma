@@ -6,7 +6,7 @@ from typing import List, Optional, Pattern, Union
 from functools import lru_cache
 
 # Pre-compiled patterns for better performance
-DEFAULT_TOKEN_PATTERN = re.compile(r'\b\w+\b')
+DEFAULT_TOKEN_PATTERN = re.compile(r'\b(?:\d+(?:\.\d+)?|\w+)\b')
 URL_PATTERN = re.compile(r'https?://\S+|www\.\S+')
 EMAIL_PATTERN = re.compile(r'\S+@\S+\.\S+')
 NUMBER_PATTERN = re.compile(r'\b\d+(?:\.\d+)?\b')
