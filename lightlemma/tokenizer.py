@@ -100,6 +100,10 @@ class Tokenizer:
         
         return tokens
 
+# Create a module-level default tokenizer for performance optimization
+# This avoids recreating the tokenizer and recompiling regex patterns on every call
+_DEFAULT_TOKENIZER = Tokenizer()
+
 # Provide simple functions for common use cases
 def tokenize(text: str) -> List[str]:
     """
@@ -107,6 +111,9 @@ def tokenize(text: str) -> List[str]:
     
     This function splits text into words using word boundaries,
     lowercases all tokens, and preserves numbers.
+    
+    Performance optimized: Uses a singleton tokenizer to avoid 
+    recreating objects and recompiling regex patterns.
     
     Args:
         text: The text to tokenize.
@@ -117,8 +124,7 @@ def tokenize(text: str) -> List[str]:
     Raises:
         TypeError: If text is not a string.
     """
-    tokenizer = Tokenizer()
-    return tokenizer.tokenize(text)
+    return _DEFAULT_TOKENIZER.tokenize(text)
 
 
 @lru_cache(maxsize=1024)
