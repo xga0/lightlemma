@@ -1,63 +1,102 @@
 # Deployment Guide
 
-This project uses GitHub Actions to automatically test and deploy to PyPI when changes are pushed to the main branch.
+This project uses a release-based deployment workflow. Here's how to release a new version:
 
-## Workflow Overview
+## Steps to Release
 
-The deployment workflow (`test-and-deploy.yml`) performs the following steps:
+1. **Update version numbers** in your code:
+   ```bash
+   # Update version in pyproject.toml
+   vim pyproject.toml  # Change version = "x.y.z"
+   
+   # Update version in __init__.py  
+   vim lightlemma/__init__.py  # Change __version__ = "x.y.z"
+   ```
 
-1. **Testing**: Runs the test suite across multiple Python versions (3.8-3.12)
-2. **Version Bumping**: Automatically increments the patch version number
-3. **Building**: Creates distribution packages
-4. **Publishing**: Uploads to PyPI if all tests pass
-5. **Tagging**: Creates a git tag and GitHub release
+2. **Commit and push your changes**:
+   ```bash
+   git add .
+   git commit -m "Prepare release x.y.z"
+   git push origin main
+   ```
 
-## Initial Setup
+3. **Create and push a tag**:
+   ```bash
+   # Create a tag (must start with 'v')
+   git tag v0.1.4
+   
+   # Push the tag
+   git push origin v0.1.4
+   ```
 
-To enable automatic deployment, you need to configure the following GitHub repository secrets:
+4. **Create a GitHub Release**:
+   - Go to your GitHub repository
+   - Click **Releases** → **Create a new release**
+   - Select the tag you just pushed (e.g., `v0.1.4`)
+   - Add a release title and description
+   - Click **Publish release**
 
-### Required Secrets
+## What Happens Next
 
-1. **PYPI_API_TOKEN**: Your PyPI API token
-   - Go to [PyPI Account Settings](https://pypi.org/manage/account/token/)
-   - Create a new API token with scope "Entire account"
-   - Add it as a repository secret named `PYPI_API_TOKEN`
+When you **publish a GitHub release**:
 
-### Setting up GitHub Secrets
+1. **Tests run** across Python 3.8-3.12
+2. **Version verification** ensures release tag matches `pyproject.toml`
+3. **Package builds** if tests pass
+4. **Deploys to PyPI** automatically
+5. **Updates release** with PyPI package link
 
-1. Go to your GitHub repository
-2. Click **Settings** → **Secrets and variables** → **Actions**
-3. Click **New repository secret**
-4. Add the `PYPI_API_TOKEN` secret
+## Workflow Triggers
 
-## How Deployment Works
+- **GitHub Release publication**: Runs tests + deploys if successful
+- **Pull requests**: Runs tests only (no deployment)
+- **Tag pushes**: No action (deployment waits for release)
 
-### Automatic Deployment
+## Version Format
 
-- **Trigger**: Push to `main` branch
-- **Version**: Automatically bumps patch version (e.g., 0.1.2 → 0.1.3)
-- **Condition**: Only deploys if all tests pass
+- Tags must start with `v` (e.g., `v0.1.4`, `v1.0.0`)
+- Version in `pyproject.toml` must match tag (without `v` prefix)
+- Version in `__init__.py` should also match for consistency
 
-### Manual Deployment
+## Example Release Process
 
-You can also trigger deployment manually with custom version bumping:
+```bash
+# Prepare version 0.1.5
+sed -i 's/version = "0.1.4"/version = "0.1.5"/' pyproject.toml
+sed -i 's/__version__ = "0.1.4"/__version__ = "0.1.5"/' lightlemma/__init__.py
 
-1. Go to **Actions** tab in your GitHub repository
-2. Select **Test and Deploy to PyPI** workflow
-3. Click **Run workflow**
-4. Choose version bump type:
-   - `patch`: 0.1.2 → 0.1.3 (default)
-   - `minor`: 0.1.2 → 0.2.0
-   - `major`: 0.1.2 → 1.0.0
+# Commit and tag
+git add .
+git commit -m "Prepare release 0.1.5"
+git push origin main
+git tag v0.1.5
+git push origin v0.1.5
 
-## Workflow Files
+# Then create GitHub Release manually from the web interface
+# selecting tag v0.1.5
+```
 
-- `.github/workflows/test-and-deploy.yml`: Main workflow configuration
-- `.github/workflows/version_bump.py`: Custom version bumping script
+## Benefits of This Approach
+
+- **Full control**: You decide when to deploy by publishing releases
+- **Release notes**: Add meaningful descriptions to your releases  
+- **Testing first**: Tags can exist without deployment until you're ready
+- **Clear history**: GitHub releases provide a clear record of all deployments
+
+## Required Setup
+
+To enable deployment, you need to configure the following GitHub repository secret:
+
+### PYPI_API_TOKEN
+
+1. Go to [PyPI Account Settings](https://pypi.org/manage/account/token/)
+2. Create a new API token with scope "Entire account"
+3. In your GitHub repository: **Settings** → **Secrets and variables** → **Actions**
+4. Add secret named `PYPI_API_TOKEN` with your token value
 
 ## Testing Locally
 
-Before pushing, you can test the package build locally:
+Before creating a release, test locally:
 
 ```bash
 # Install development dependencies
@@ -71,35 +110,29 @@ python -m build
 twine check dist/*
 ```
 
-## Version Management
+## Rolling Back
 
-The current version is stored in `pyproject.toml` and follows semantic versioning:
+If deployment fails, you can:
+1. Fix the issues in your code
+2. Create a new patch version
+3. Push a new tag and create a new release
 
-- **Patch** (0.1.2 → 0.1.3): Bug fixes, small improvements
-- **Minor** (0.1.2 → 0.2.0): New features, backwards compatible
-- **Major** (0.1.2 → 1.0.0): Breaking changes
+**Note**: You cannot reuse the same tag/version number on PyPI.
 
 ## Troubleshooting
 
-### Tests Failing
+### Common Issues
 
-If tests fail, the deployment will be automatically cancelled. Fix the issues and push again.
+- **Tests failing**: Fix the code and create a new version/tag/release
+- **Version mismatch**: Ensure release tag version matches `pyproject.toml`
+- **PyPI upload errors**: 
+  - `401 Unauthorized`: Check `PYPI_API_TOKEN` secret
+  - `403 Forbidden`: Version already exists on PyPI
+  - `400 Bad Request`: Package validation failed
 
-### PyPI Upload Errors
+### Security Notes
 
-Common issues:
-- **401 Unauthorized**: Check your `PYPI_API_TOKEN` secret
-- **403 Forbidden**: Version already exists on PyPI
-- **400 Bad Request**: Package validation failed
-
-### Version Conflicts
-
-If a version already exists on PyPI, the workflow will fail. You can:
-1. Run the workflow manually with a higher version bump type
-2. Or wait for the next push (which will auto-increment)
-
-## Security Notes
-
-- The `PYPI_API_TOKEN` should be kept secure and never exposed in logs
-- The workflow only runs on the main branch to prevent unauthorized deployments
-- All tests must pass before any deployment proceeds 
+- Keep `PYPI_API_TOKEN` secure and never expose in logs
+- Deployment only happens when you publish releases, giving you full control
+- All tests must pass before deployment proceeds
+- Release publication is the trigger, not tag creation 

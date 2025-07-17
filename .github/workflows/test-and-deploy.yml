@@ -1,21 +1,13 @@
 name: Test and Deploy to PyPI
 
 on:
-  push:
-    branches: [ main ]
+  # Trigger on GitHub release publication
+  release:
+    types: [published]
+  
+  # Still allow PRs for testing only (no deployment)
   pull_request:
     branches: [ main ]
-  workflow_dispatch: # Allow manual triggering
-    inputs:
-      version_bump:
-        description: 'Version bump type'
-        required: true
-        default: 'patch'
-        type: choice
-        options:
-        - patch
-        - minor
-        - major
 
 permissions:
   contents: write
@@ -55,15 +47,11 @@ jobs:
   deploy:
     needs: test
     runs-on: ubuntu-latest
-    # Only deploy on main branch pushes or manual workflow dispatch
-    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    # Only deploy on release publication
+    if: github.event_name == 'release'
     
     steps:
     - uses: actions/checkout@v4
-      with:
-        fetch-depth: 0
-        token: ${{ secrets.GITHUB_TOKEN }}
-        persist-credentials: true
     
     - name: Set up Python
       uses: actions/setup-python@v4
@@ -75,37 +63,30 @@ jobs:
         python -m pip install --upgrade pip
         pip install build twine
     
-    - name: Configure git
+    - name: Extract version from release tag
+      id: version
       run: |
-        git config --global user.email "action@github.com"
-        git config --global user.name "GitHub Action"
-        git config --global --add safe.directory /github/workspace
+        # Extract version from release tag (remove 'v' prefix)
+        VERSION=${GITHUB_REF#refs/tags/v}
+        echo "version=$VERSION" >> $GITHUB_OUTPUT
+        echo "Deploying version: $VERSION"
+        echo "Release name: ${{ github.event.release.name }}"
+        echo "Release tag: ${{ github.event.release.tag_name }}"
     
-    - name: Bump version
-      id: bump
+    - name: Verify version matches
       run: |
-        # Determine version bump type
-        if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-          BUMP_TYPE="${{ github.event.inputs.version_bump }}"
-        else
-          BUMP_TYPE="patch"
+        # Check that the release tag version matches the version in pyproject.toml
+        TOML_VERSION=$(grep -Po '(?<=version = ")[^"]*' pyproject.toml)
+        TAG_VERSION=${{ steps.version.outputs.version }}
+        
+        echo "Version in pyproject.toml: $TOML_VERSION"
+        echo "Version from release tag: $TAG_VERSION"
+        
+        if [ "$TOML_VERSION" != "$TAG_VERSION" ]; then
+          echo "Error: Version mismatch between release tag ($TAG_VERSION) and pyproject.toml ($TOML_VERSION)"
+          exit 1
         fi
-        
-        # Run version bump script
-        python .github/workflows/version_bump.py pyproject.toml $BUMP_TYPE > bump_output.txt
-        
-        # Extract version information
-        NEW_VERSION=$(grep "Bumped version from" bump_output.txt | sed 's/.*to //')
-        OLD_VERSION=$(grep "Bumped version from" bump_output.txt | sed 's/Bumped version from //' | sed 's/ to.*//')
-        
-        echo "Old version: $OLD_VERSION"
-        echo "New version: $NEW_VERSION"
-        echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
-        
-        # Commit version bump
-        git add pyproject.toml
-        git commit -m "Bump version to $NEW_VERSION"
-        git tag "v$NEW_VERSION"
+        echo "Version verification passed!"
     
     - name: Build package
       run: |
@@ -118,22 +99,20 @@ jobs:
       run: |
         twine upload dist/*
     
-    - name: Push changes
-      run: |
-        git push origin main
-        git push origin --tags
-    
-    - name: Create GitHub Release
-      uses: softprops/action-gh-release@v1
+    - name: Update release with PyPI link
+      uses: actions/github-script@v7
       with:
-        tag_name: v${{ steps.bump.outputs.version }}
-        name: Release v${{ steps.bump.outputs.version }}
-        body: |
-          Automated release v${{ steps.bump.outputs.version }}
+        script: |
+          const { owner, repo } = context.repo;
+          const release_id = context.payload.release.id;
+          const version = "${{ steps.version.outputs.version }}";
           
-          ## Changes
-          - Automatic version bump and deployment
-          - All tests passed successfully
-        draft: false
-        prerelease: false
-        token: ${{ secrets.GITHUB_TOKEN }} 
+          const currentBody = context.payload.release.body || "";
+          const pypiLink = `\n\n📦 **Package available on PyPI**: https://pypi.org/project/lightlemma/${version}/`;
+          
+          await github.rest.repos.updateRelease({
+            owner,
+            repo,
+            release_id,
+            body: currentBody + pypiLink
+          }); 
