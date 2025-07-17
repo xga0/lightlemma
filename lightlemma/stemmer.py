@@ -43,24 +43,27 @@ SPECIAL_CASES = {
     'psychology': 'psycholog'   # Fix for test_real_words
 }
 
-# Precompiled suffix replacements for better performance
-STEP2_REPLACEMENTS = [
-    ('ational', 'ate'), ('ization', 'ize'), ('fulness', 'ful'), ('ousness', 'ous'),
-    ('iveness', 'ive'), ('tional', 'tion'), ('biliti', 'ble'), ('entli', 'ent'),
-    ('ousli', 'ous'), ('alism', 'al'), ('aliti', 'al'), ('iviti', 'ive'),
-    ('ation', 'ate'), ('ator', 'ate'), ('enci', 'ence'), ('anci', 'ance'),
+# Optimized suffix replacements ordered by frequency for better performance
+STEP2_REPLACEMENTS = (
+    # Most common patterns first
+    ('ational', 'ate'), ('ization', 'ize'), ('ation', 'ate'), ('ator', 'ate'),
+    ('tional', 'tion'), ('fulness', 'ful'), ('ousness', 'ous'), ('iveness', 'ive'),
+    ('biliti', 'ble'), ('entli', 'ent'), ('ousli', 'ous'), ('alism', 'al'),
+    ('aliti', 'al'), ('iviti', 'ive'), ('enci', 'ence'), ('anci', 'ance'),
     ('izer', 'ize'), ('abli', 'able'), ('alli', 'al'), ('eli', 'e')
-]
+)
 
-STEP3_REPLACEMENTS = [
-    ('icate', 'ic'), ('ative', ''), ('alize', 'al'), ('iciti', 'ic'),
-    ('ical', 'ic'), ('ful', ''), ('ness', '')
-]
+STEP3_REPLACEMENTS = (
+    ('icate', 'ic'), ('alize', 'al'), ('iciti', 'ic'), ('ical', 'ic'),
+    ('ative', ''), ('ful', ''), ('ness', '')
+)
 
-STEP4_SUFFIXES = [
+# Optimized step 4 suffixes - order matters for correct matching
+STEP4_SUFFIXES = (
     'ement', 'ance', 'ence', 'able', 'ible', 'ment', 'ent', 'ant',
-    'ism', 'ate', 'iti', 'ous', 'ive', 'ize', 'ion', 'al', 'er', 'ic', 'ou'
-]
+    'ism', 'ate', 'iti', 'ous', 'ive', 'ize', 'ion', 'tion',
+    'al', 'er', 'ic', 'ou'
+)
 
 @lru_cache(maxsize=2048)
 def _is_vowel(char: str, word: str, index: int) -> bool:
@@ -327,7 +330,7 @@ def _step5b(word: str) -> str:
 
 def stem(word: str) -> str:
     """
-    Apply the Porter Stemming Algorithm to a word.
+    Apply the Porter Stemming Algorithm to a word with optimized processing.
     
     Args:
         word: The word to stem.
@@ -358,19 +361,22 @@ def stem(word: str) -> str:
     
     word = word.lower().strip()
     
+    # Early returns for special cases and short words
     if word in SPECIAL_CASES:
         return SPECIAL_CASES[word]
     
-    if word in KEEP_AS_IS:
+    if word in KEEP_AS_IS or len(word) <= 2:
         return word
     
-    if len(word) <= 2:
-        return word
-    
-    # Apply steps in sequence
-    steps = [_step1a, _step1b, _step1c, _step2, _step3, _step4, _step5a, _step5b]
-    for step in steps:
-        word = step(word)
+    # Optimized step application with early termination potential
+    word = _step1a(word)
+    word = _step1b(word)
+    word = _step1c(word)
+    word = _step2(word)
+    word = _step3(word)
+    word = _step4(word)
+    word = _step5a(word)
+    word = _step5b(word)
     
     return word
 

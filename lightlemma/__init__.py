@@ -9,7 +9,7 @@ from .tokenizer import (
     text_to_lemmas, text_to_stems, text_to_lemmas_batch, text_to_stems_batch
 )
 
-__version__ = "0.1.2"
+__version__ = "0.1.3"
 __all__ = [
     "lemmatize", "lemmatize_batch", "stem", "stem_batch", 
     "tokenize", "tokenize_cached", "tokenize_batch", "Tokenizer", 
