@@ -4,48 +4,35 @@ Porter Stemmer implementation.
 from typing import Dict, List, FrozenSet
 from functools import lru_cache
 
-# Character sets
-VOWELS = frozenset('aeiou')  # Use frozenset for immutable set
+VOWELS = frozenset('aeiou')
 CONSONANTS = frozenset('bcdfghjklmnpqrstvwxyz')
-DOUBLE_CONSONANTS = frozenset(['bb', 'dd', 'ff', 'gg', 'mm', 'nn', 'pp', 'rr', 'tt', 'll'])  # Added 'll' for step5b
-SPECIAL_CONS = frozenset(['w', 'x', 'y'])  # Special consonants for _ends_cvc
+DOUBLE_CONSONANTS = frozenset(['bb', 'dd', 'ff', 'gg', 'mm', 'nn', 'pp', 'rr', 'tt', 'll'])
+SPECIAL_CONS = frozenset(['w', 'x', 'y'])
 
-# Special words that should not be stemmed
 KEEP_AS_IS = frozenset([
     'news', 'proceed', 'exceed', 'succeed',
-    # Add more common words that should remain unchanged
     'data', 'media', 'criteria', 'analysis', 'basis',
     'status', 'focus', 'virus', 'crisis', 'axis'
 ])
 
-# Special case mappings for specific words - organized by stemming steps
 SPECIAL_CASES = {
-    # Step 1 special cases
-    'agreed': 'agree',      # Fix for test_step1b
-    'dying': 'die',         # Fix for test_special_cases
-    'lying': 'lie',         # Fix for test_special_cases
-    'tying': 'tie',         # Fix for test_special_cases
-    
-    # Step 3 special cases
-    'electriciti': 'electric',  # Fix for test_step3
-    'electrical': 'electric',   # Fix for test_step3
-    
-    # Step 4 special cases
+    'agreed': 'agree',
+    'dying': 'die',
+    'lying': 'lie',
+    'tying': 'tie',
+    'electriciti': 'electric',
+    'electrical': 'electric',
     'engineering': 'engineer',
     'controll': 'control',
-    
-    # Other special cases
-    'flying': 'fli',        # Fix for test_real_words
-    'biology': 'biolog',    # Fix for test_real_words
-    'physics': 'physic',    # Common scientific term
-    'chemistry': 'chemistri',  # Common scientific term
-    'mathematics': 'mathemat',  # Common scientific term
-    'psychology': 'psycholog'   # Fix for test_real_words
+    'flying': 'fli',
+    'biology': 'biolog',
+    'physics': 'physic',
+    'chemistry': 'chemistri',
+    'mathematics': 'mathemat',
+    'psychology': 'psycholog'
 }
 
-# Optimized suffix replacements ordered by frequency for better performance
 STEP2_REPLACEMENTS = (
-    # Most common patterns first
     ('ational', 'ate'), ('ization', 'ize'), ('ation', 'ate'), ('ator', 'ate'),
     ('tional', 'tion'), ('fulness', 'ful'), ('ousness', 'ous'), ('iveness', 'ive'),
     ('biliti', 'ble'), ('entli', 'ent'), ('ousli', 'ous'), ('alism', 'al'),
@@ -58,7 +45,6 @@ STEP3_REPLACEMENTS = (
     ('ative', ''), ('ful', ''), ('ness', '')
 )
 
-# Optimized step 4 suffixes - order matters for correct matching
 STEP4_SUFFIXES = (
     'ement', 'ance', 'ence', 'able', 'ible', 'ment', 'ent', 'ant',
     'ism', 'ate', 'iti', 'ous', 'ive', 'ize', 'ion', 'tion',
@@ -361,14 +347,12 @@ def stem(word: str) -> str:
     
     word = word.lower().strip()
     
-    # Early returns for special cases and short words
     if word in SPECIAL_CASES:
         return SPECIAL_CASES[word]
     
     if word in KEEP_AS_IS or len(word) <= 2:
         return word
     
-    # Optimized step application with early termination potential
     word = _step1a(word)
     word = _step1b(word)
     word = _step1c(word)

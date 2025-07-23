@@ -5,7 +5,6 @@ import re
 from typing import List, Optional, Pattern, Union
 from functools import lru_cache
 
-# Pre-compiled patterns for better performance
 DEFAULT_TOKEN_PATTERN = re.compile(r'\b(?:\d+(?:\.\d+)?|\w+)\b')
 URL_PATTERN = re.compile(r'https?://\S+|www\.\S+')
 EMAIL_PATTERN = re.compile(r'\S+@\S+\.\S+')
@@ -69,21 +68,18 @@ class Tokenizer:
         tokens = []
         working_text = text
         
-        # Extract and preserve URLs if requested
         if self.preserve_urls:
             urls = URL_PATTERN.findall(working_text)
             for url in urls:
                 working_text = working_text.replace(url, " <URL> ")
                 tokens.append(url)
         
-        # Extract and preserve emails if requested
         if self.preserve_emails:
             emails = EMAIL_PATTERN.findall(working_text)
             for email in emails:
                 working_text = working_text.replace(email, " <EMAIL> ")
                 tokens.append(email)
         
-        # Handle the main tokenization
         if self.preserve_punctuation:
             words = self.pattern.findall(working_text)
             punctuation = PUNCTUATION_PATTERN.findall(working_text)
@@ -92,7 +88,6 @@ class Tokenizer:
         else:
             tokens.extend(self.pattern.findall(working_text))
         
-        # Filter out empty tokens and handle case/numbers
         tokens = [t for t in tokens if t and (self.preserve_numbers or not t.isdigit())]
         
         if not self.preserve_case:
@@ -100,11 +95,8 @@ class Tokenizer:
         
         return tokens
 
-# Create a module-level default tokenizer for performance optimization
-# This avoids recreating the tokenizer and recompiling regex patterns on every call
 _DEFAULT_TOKENIZER = Tokenizer()
 
-# Provide simple functions for common use cases
 def tokenize(text: str) -> List[str]:
     """
     Tokenize text into words using default settings.
@@ -126,7 +118,6 @@ def tokenize(text: str) -> List[str]:
     """
     return _DEFAULT_TOKENIZER.tokenize(text)
 
-
 @lru_cache(maxsize=1024)
 def tokenize_cached(text: str) -> List[str]:
     """
@@ -146,9 +137,6 @@ def tokenize_cached(text: str) -> List[str]:
     """
     return tokenize(text)
 
-
-# Chain functions for combined tokenization and normalization
-# Optimized case preservation function to reduce code duplication
 def _preserve_case(original_tokens: List[str], processed_tokens: List[str]) -> List[str]:
     """
     Apply original case patterns to processed tokens efficiently.
@@ -200,7 +188,6 @@ def text_to_lemmas(text: str, tokenizer_options: Optional[dict] = None, preserve
     tokenizer = Tokenizer(**tokenizer_options)
     
     if preserve_original_case:
-        # Create case-preserving tokenizer
         case_tokenizer = Tokenizer(
             pattern=tokenizer.pattern,
             preserve_case=True,
@@ -215,7 +202,6 @@ def text_to_lemmas(text: str, tokenizer_options: Optional[dict] = None, preserve
     else:
         tokens = tokenizer.tokenize(text)
         return lemmatize_batch(tokens)
-
 
 def text_to_stems(text: str, tokenizer_options: Optional[dict] = None, preserve_original_case: bool = False) -> List[str]:
     """
@@ -262,7 +248,6 @@ def text_to_stems(text: str, tokenizer_options: Optional[dict] = None, preserve_
         tokens = tokenizer.tokenize(text)
         return stem_batch(tokens)
 
-
 def tokenize_batch(texts: List[str], tokenizer_options: Optional[dict] = None) -> List[List[str]]:
     """
     Tokenize a batch of texts efficiently.
@@ -304,8 +289,6 @@ def tokenize_batch(texts: List[str], tokenizer_options: Optional[dict] = None) -
     
     return results
 
-
-# Optimized batch processing helper to reduce code duplication
 def _process_text_batch(texts: List[str], processor_func, tokenizer_options: Optional[dict] = None, preserve_original_case: bool = False) -> List[List[str]]:
     """
     Generic helper for batch text processing with tokenization.
@@ -382,7 +365,6 @@ def text_to_lemmas_batch(texts: List[str], tokenizer_options: Optional[dict] = N
     """
     from .lemmatizer import lemmatize_batch
     return _process_text_batch(texts, lemmatize_batch, tokenizer_options, preserve_original_case)
-
 
 def text_to_stems_batch(texts: List[str], tokenizer_options: Optional[dict] = None, preserve_original_case: bool = False) -> List[List[str]]:
     """

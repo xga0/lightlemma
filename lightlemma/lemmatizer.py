@@ -12,25 +12,19 @@ VOWELS: FrozenSet[str] = frozenset('aeiou')
 CONSONANTS: FrozenSet[str] = frozenset('bcdfghjklmnpqrstvwxyz')
 CVC_EXCLUSIONS: FrozenSet[str] = frozenset('wxy')
 
-# Optimized pattern compilation with priority ordering for efficiency
 PATTERNS = {
-    # High-frequency patterns first for better performance
     'ing': re.compile(r'ing$'),
     'past': re.compile(r'ed$|d$'),
     'plural': re.compile(r'(?:ies|es|s)$'),
     'ly': re.compile(r'ly$'),
     'ness': re.compile(r'ness$'),
     'ment': re.compile(r'ment$'),
-    
-    # Medium-frequency patterns
     'tion_sion': re.compile(r'(?:ation|ition|tion|sion)$'),
     'ance_ence': re.compile(r'(?:ance|ence)$'),
     'able_ible': re.compile(r'(?:able|ible)$'),
     'ity_ety': re.compile(r'(?:ity|ety)$'),
     'ful': re.compile(r'ful$'),
     'ic_ical': re.compile(r'(?:ical|ic)$'),
-    
-    # Lower-frequency patterns
     'ves_plural': re.compile(r'ves$'),
     'ant_ent': re.compile(r'(?:ant|ent)$'),
     'ous_ious': re.compile(r'(?:ous|ious)$'),
@@ -66,32 +60,20 @@ KEEP_AS_IS = frozenset([
     'basis', 'status', 'focus', 'virus', 'crisis', 'axis'
 ])
 
-# Optimized special cases dictionary - organized by category for better maintainability
 SPECIAL_CASES = {
-    # Irregular forms
     'phenomena': 'phenomenon', 'beautiful': 'beauty', 'likable': 'like', 'readable': 'read',
     'government': 'govern', 'development': 'develop', 'statement': 'state',
     'happiness': 'happy', 'darkness': 'dark', 'famous': 'famous',
-    
-    # Past tense irregularities
     'walked': 'walk', 'planned': 'plan', 'copied': 'copy', 'agreed': 'agree',
     'died': 'die', 'saved': 'save', 'studied': 'study', 'tried': 'try',
-    
-    # Present participle irregularities  
     'walking': 'walk', 'falling': 'fall', 'going': 'go', 'doing': 'do', 
     'having': 'have', 'being': 'be', 'creating': 'create',
-    
-    # Irregular past forms
     'went': 'go', 'gone': 'go', 'done': 'do', 'said': 'say', 'made': 'make',
-    
-    # Suffix-based irregularities
     'logical': 'logic', 'historical': 'historic', 'musical': 'music',
     'decision': 'decide', 'admission': 'admit', 'activation': 'activate', 'creation': 'create',
     'curious': 'curious', 'acceptance': 'accept', 'dependent': 'depend', 
     'persistence': 'persist', 'assistant': 'assist', 'performance': 'perform',
     'northward': 'northward', 'security': 'secure',
-    
-    # Compound word irregularities
     'childhood': 'child', 'friendship': 'friend', 'kingdom': 'king', 
     'actor': 'act', 'teacher': 'teach'
 }
@@ -240,7 +222,6 @@ def _handle_ness_suffix(word: str) -> str:
     stem = word[:-4]
     return stem[:-1] + 'y' if stem.endswith('i') else stem
 
-# Optimized suffix handlers for better performance and maintainability
 def _handle_ly_suffix(word: str) -> str:
     """Handle -ly suffix."""
     return word[:-3] + 'y' if word.endswith('ily') else word[:-2]
@@ -267,10 +248,8 @@ def _handle_ment_suffix(word: str) -> str:
 def _handle_tion_sion_suffix(word: str) -> str:
     """Handle -tion/-sion suffix."""
     if word.endswith(('ation', 'ition')):
-        # For words ending in -ation/-ition, remove -ion
         return word[:-3]
     elif word.endswith(('tion', 'sion')):
-        # For words ending in -tion/-sion, remove -ion and add 'e' if appropriate
         stem = word[:-3]
         return stem + 'e' if len(stem) > 2 else stem
     return word
@@ -308,7 +287,6 @@ def _handle_base_verbs_suffix(word: str) -> str:
     """Handle base verb endings."""
     return word[:-3] if word.endswith('eth') else word
 
-# Pattern-to-handler mapping for efficient dispatch
 PATTERN_HANDLERS = {
     'ing': _handle_gerund_forms,
     'past': _handle_past_tense,
@@ -327,7 +305,6 @@ PATTERN_HANDLERS = {
     'age': _handle_age_suffix,
     'base_verbs': _handle_base_verbs_suffix,
     'eth': _handle_base_verbs_suffix,
-    # Patterns that don't change the word
     'ous_ious': lambda word: word,
     'directional': lambda word: word,
     'ideology': lambda word: word,
@@ -342,24 +319,20 @@ def _apply_rules(word: str) -> str:
     This function uses a dispatch table for efficient pattern matching
     instead of a long if-elif chain, improving performance significantly.
     """
-    # Check special cases and irregular forms first (most specific)
     if word in SPECIAL_CASES:
         return SPECIAL_CASES[word]
     
     if word in IRREGULAR_FORMS:
         return IRREGULAR_FORMS[word]
     
-    # Handle Latin plurals
     word, changed = _handle_latin_plurals(word)
     if changed:
         return word
     
-    # Handle -ves plurals
     word, changed = _handle_ves_plurals(word)
     if changed:
         return word
     
-    # Efficient pattern matching with priority ordering
     for pattern_name, pattern in PATTERNS.items():
         if pattern.search(word):
             handler = PATTERN_HANDLERS.get(pattern_name)
