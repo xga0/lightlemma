@@ -2,7 +2,7 @@
 Tokenizer implementation for splitting text into words/tokens.
 """
 import re
-from typing import List, Optional, Pattern, Union
+from typing import List, Optional, Pattern, Union, Dict
 from functools import lru_cache
 
 DEFAULT_TOKEN_PATTERN = re.compile(r'\b(?:\d+(?:\.\d+)?|\w+)\b')
@@ -71,13 +71,13 @@ class Tokenizer:
         if self.preserve_urls:
             urls = URL_PATTERN.findall(working_text)
             for url in urls:
-                working_text = working_text.replace(url, " <URL> ")
+                working_text = working_text.replace(url, " ")
                 tokens.append(url)
         
         if self.preserve_emails:
             emails = EMAIL_PATTERN.findall(working_text)
             for email in emails:
-                working_text = working_text.replace(email, " <EMAIL> ")
+                working_text = working_text.replace(email, " ")
                 tokens.append(email)
         
         if self.preserve_punctuation:
@@ -88,7 +88,7 @@ class Tokenizer:
         else:
             tokens.extend(self.pattern.findall(working_text))
         
-        tokens = [t for t in tokens if t and (self.preserve_numbers or not t.isdigit())]
+        tokens = [t for t in tokens if t and (self.preserve_numbers or not t.replace('.', '').isdigit())]
         
         if not self.preserve_case:
             tokens = [t.lower() for t in tokens]
@@ -137,28 +137,20 @@ def tokenize_cached(text: str) -> List[str]:
     """
     return tokenize(text)
 
-def _preserve_case(original_tokens: List[str], processed_tokens: List[str]) -> List[str]:
-    """
-    Apply original case patterns to processed tokens efficiently.
+@lru_cache(maxsize=512)
+def _apply_case_pattern(original: str, processed: str) -> str:
+    """Apply original case pattern to processed token efficiently."""
+    if not original or not processed:
+        return processed
     
-    Args:
-        original_tokens: Tokens with original case
-        processed_tokens: Tokens after processing (lemmatization/stemming)
-        
-    Returns:
-        Processed tokens with original case patterns preserved
-    """
-    result = []
-    for original, processed in zip(original_tokens, processed_tokens):
-        if original.isupper():
-            result.append(processed.upper())
-        elif original and original[0].isupper():
-            result.append(processed.capitalize())
-        else:
-            result.append(processed)
-    return result
+    if original.isupper():
+        return processed.upper()
+    elif original[0].isupper():
+        return processed.capitalize()
+    else:
+        return processed
 
-def text_to_lemmas(text: str, tokenizer_options: Optional[dict] = None, preserve_original_case: bool = False) -> List[str]:
+def text_to_lemmas(text: str, tokenizer_options: Optional[Dict] = None, preserve_original_case: bool = False) -> List[str]:
     """
     Process text directly to lemmatized tokens in one step.
     
@@ -185,25 +177,17 @@ def text_to_lemmas(text: str, tokenizer_options: Optional[dict] = None, preserve
     if tokenizer_options is None:
         tokenizer_options = {}
     
-    tokenizer = Tokenizer(**tokenizer_options)
-    
     if preserve_original_case:
-        case_tokenizer = Tokenizer(
-            pattern=tokenizer.pattern,
-            preserve_case=True,
-            preserve_urls=tokenizer.preserve_urls,
-            preserve_emails=tokenizer.preserve_emails,
-            preserve_numbers=tokenizer.preserve_numbers,
-            preserve_punctuation=tokenizer.preserve_punctuation
-        )
+        case_tokenizer = Tokenizer(preserve_case=True, **tokenizer_options)
         tokens_with_case = case_tokenizer.tokenize(text)
         lemmas = lemmatize_batch([token.lower() for token in tokens_with_case])
-        return _preserve_case(tokens_with_case, lemmas)
+        return [_apply_case_pattern(orig, lemma) for orig, lemma in zip(tokens_with_case, lemmas)]
     else:
+        tokenizer = Tokenizer(**tokenizer_options)
         tokens = tokenizer.tokenize(text)
         return lemmatize_batch(tokens)
 
-def text_to_stems(text: str, tokenizer_options: Optional[dict] = None, preserve_original_case: bool = False) -> List[str]:
+def text_to_stems(text: str, tokenizer_options: Optional[Dict] = None, preserve_original_case: bool = False) -> List[str]:
     """
     Process text directly to stemmed tokens in one step.
     
@@ -230,25 +214,17 @@ def text_to_stems(text: str, tokenizer_options: Optional[dict] = None, preserve_
     if tokenizer_options is None:
         tokenizer_options = {}
     
-    tokenizer = Tokenizer(**tokenizer_options)
-    
     if preserve_original_case:
-        case_tokenizer = Tokenizer(
-            pattern=tokenizer.pattern,
-            preserve_case=True,
-            preserve_urls=tokenizer.preserve_urls,
-            preserve_emails=tokenizer.preserve_emails,
-            preserve_numbers=tokenizer.preserve_numbers,
-            preserve_punctuation=tokenizer.preserve_punctuation
-        )
+        case_tokenizer = Tokenizer(preserve_case=True, **tokenizer_options)
         tokens_with_case = case_tokenizer.tokenize(text)
         stems = stem_batch([token.lower() for token in tokens_with_case])
-        return _preserve_case(tokens_with_case, stems)
+        return [_apply_case_pattern(orig, stem) for orig, stem in zip(tokens_with_case, stems)]
     else:
+        tokenizer = Tokenizer(**tokenizer_options)
         tokens = tokenizer.tokenize(text)
         return stem_batch(tokens)
 
-def tokenize_batch(texts: List[str], tokenizer_options: Optional[dict] = None) -> List[List[str]]:
+def tokenize_batch(texts: List[str], tokenizer_options: Optional[Dict] = None) -> List[List[str]]:
     """
     Tokenize a batch of texts efficiently.
     
@@ -280,66 +256,19 @@ def tokenize_batch(texts: List[str], tokenizer_options: Optional[dict] = None) -
         tokenizer_options = {}
     
     tokenizer = Tokenizer(**tokenizer_options)
-    
-    results = []
-    for text in texts:
-        if not isinstance(text, str):
-            raise TypeError("All items in list must be strings")
-        results.append(tokenizer.tokenize(text))
-    
-    return results
+    return [tokenizer.tokenize(text) if isinstance(text, str) else [] for text in texts]
 
-def _process_text_batch(texts: List[str], processor_func, tokenizer_options: Optional[dict] = None, preserve_original_case: bool = False) -> List[List[str]]:
-    """
-    Generic helper for batch text processing with tokenization.
-    
-    Args:
-        texts: List of texts to process
-        processor_func: Function to apply to tokens (lemmatize_batch or stem_batch)
-        tokenizer_options: Optional tokenizer settings
-        preserve_original_case: Whether to preserve original case
-        
-    Returns:
-        List of processed token lists
-    """
-    if not isinstance(texts, list):
-        raise TypeError("Input must be a list")
-    
-    if not texts:
-        return []
-    
-    if tokenizer_options is None:
-        tokenizer_options = {}
-    
+def _create_shared_tokenizers(tokenizer_options: Dict, preserve_original_case: bool):
+    """Create shared tokenizer instances to reduce object creation."""
     tokenizer = Tokenizer(**tokenizer_options)
     case_tokenizer = None
     
     if preserve_original_case:
-        case_tokenizer = Tokenizer(
-            pattern=tokenizer.pattern,
-            preserve_case=True,
-            preserve_urls=tokenizer.preserve_urls,
-            preserve_emails=tokenizer.preserve_emails,
-            preserve_numbers=tokenizer.preserve_numbers,
-            preserve_punctuation=tokenizer.preserve_punctuation
-        )
+        case_tokenizer = Tokenizer(preserve_case=True, **tokenizer_options)
     
-    results = []
-    for text in texts:
-        if not isinstance(text, str):
-            raise TypeError("All items in list must be strings")
-        
-        if preserve_original_case:
-            tokens_with_case = case_tokenizer.tokenize(text)
-            processed = processor_func([token.lower() for token in tokens_with_case])
-            results.append(_preserve_case(tokens_with_case, processed))
-        else:
-            tokens = tokenizer.tokenize(text)
-            results.append(processor_func(tokens))
-    
-    return results
+    return tokenizer, case_tokenizer
 
-def text_to_lemmas_batch(texts: List[str], tokenizer_options: Optional[dict] = None, preserve_original_case: bool = False) -> List[List[str]]:
+def text_to_lemmas_batch(texts: List[str], tokenizer_options: Optional[Dict] = None, preserve_original_case: bool = False) -> List[List[str]]:
     """
     Process a batch of texts directly to lemmatized tokens efficiently.
     
@@ -364,9 +293,35 @@ def text_to_lemmas_batch(texts: List[str], tokenizer_options: Optional[dict] = N
         [['the', 'cat', 'be', 'run'], ['dog', 'play']]
     """
     from .lemmatizer import lemmatize_batch
-    return _process_text_batch(texts, lemmatize_batch, tokenizer_options, preserve_original_case)
+    
+    if not isinstance(texts, list):
+        raise TypeError("Input must be a list")
+    
+    if not texts:
+        return []
+    
+    if tokenizer_options is None:
+        tokenizer_options = {}
+    
+    tokenizer, case_tokenizer = _create_shared_tokenizers(tokenizer_options, preserve_original_case)
+    
+    results = []
+    for text in texts:
+        if not isinstance(text, str):
+            results.append([])
+            continue
+        
+        if preserve_original_case:
+            tokens_with_case = case_tokenizer.tokenize(text)
+            lemmas = lemmatize_batch([token.lower() for token in tokens_with_case])
+            results.append([_apply_case_pattern(orig, lemma) for orig, lemma in zip(tokens_with_case, lemmas)])
+        else:
+            tokens = tokenizer.tokenize(text)
+            results.append(lemmatize_batch(tokens))
+    
+    return results
 
-def text_to_stems_batch(texts: List[str], tokenizer_options: Optional[dict] = None, preserve_original_case: bool = False) -> List[List[str]]:
+def text_to_stems_batch(texts: List[str], tokenizer_options: Optional[Dict] = None, preserve_original_case: bool = False) -> List[List[str]]:
     """
     Process a batch of texts directly to stemmed tokens efficiently.
     
@@ -391,4 +346,30 @@ def text_to_stems_batch(texts: List[str], tokenizer_options: Optional[dict] = No
         [['the', 'cat', 'are', 'run'], ['dog', 'play']]
     """
     from .stemmer import stem_batch
-    return _process_text_batch(texts, stem_batch, tokenizer_options, preserve_original_case) 
+    
+    if not isinstance(texts, list):
+        raise TypeError("Input must be a list")
+    
+    if not texts:
+        return []
+    
+    if tokenizer_options is None:
+        tokenizer_options = {}
+    
+    tokenizer, case_tokenizer = _create_shared_tokenizers(tokenizer_options, preserve_original_case)
+    
+    results = []
+    for text in texts:
+        if not isinstance(text, str):
+            results.append([])
+            continue
+        
+        if preserve_original_case:
+            tokens_with_case = case_tokenizer.tokenize(text)
+            stems = stem_batch([token.lower() for token in tokens_with_case])
+            results.append([_apply_case_pattern(orig, stem) for orig, stem in zip(tokens_with_case, stems)])
+        else:
+            tokens = tokenizer.tokenize(text)
+            results.append(stem_batch(tokens))
+    
+    return results 

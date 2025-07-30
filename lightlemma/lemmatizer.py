@@ -88,14 +88,23 @@ def _load_irregular_forms() -> Dict[str, str]:
         with open(data_file, 'r', encoding='utf-8') as f:
             data = json.load(f)
             irregular_forms = {}
-            for category, forms in data.items():
-                for form, lemma in forms.items():
-                    irregular_forms[form.lower()] = lemma.lower()
+            for forms in data.values():
+                irregular_forms.update({form.lower(): lemma.lower() for form, lemma in forms.items()})
             return irregular_forms
     except (FileNotFoundError, json.JSONDecodeError):
         return {}
 
 IRREGULAR_FORMS = _load_irregular_forms()
+
+LATIN_MAPPING = {
+    'phenomena': 'phenomenon', 'criteria': 'criterion', 'stigmata': 'stigma',
+    'alumni': 'alumnus', 'fungi': 'fungus', 'cacti': 'cactus',
+    'nuclei': 'nucleus', 'radii': 'radius', 'algae': 'alga',
+    'larvae': 'larva', 'nebulae': 'nebula', 'indices': 'index',
+    'matrices': 'matrix', 'appendices': 'appendix', 'vertices': 'vertex',
+    'data': 'datum', 'bacteria': 'bacterium', 'memoranda': 'memorandum',
+    'curricula': 'curriculum', 'genera': 'genus', 'corpora': 'corpus'
+}
 
 @lru_cache(maxsize=2048)
 def _count_syllables(word: str) -> int:
@@ -115,44 +124,13 @@ def _count_syllables(word: str) -> int:
     return max(1, count)
 
 @lru_cache(maxsize=1024)
-def _strip_double_consonants(word: str) -> str:
-    """Strip double consonants if appropriate."""
-    if len(word) > 2 and word[-2:] in DOUBLE_CONSONANT_ENDINGS and word not in KEEP_DOUBLE:
-        return word[:-1]
-    return word
-
-@lru_cache(maxsize=1024)
 def _is_cvc_pattern(word: str) -> bool:
     """Check if word ends with consonant-vowel-consonant pattern."""
-    if len(word) < 3:
-        return False
-    
-    return (word[-1] in CONSONANTS and
+    return (len(word) >= 3 and 
+            word[-1] in CONSONANTS and
             word[-2] in VOWELS and
             word[-3] in CONSONANTS and
             word[-1] not in CVC_EXCLUSIONS)
-
-@lru_cache(maxsize=1024)
-def _handle_latin_plurals(word: str) -> Tuple[str, bool]:
-    """Handle Latin plural forms."""
-    latin_mappings = {
-        'phenomena': 'phenomenon', 'criteria': 'criterion', 'stigmata': 'stigma',
-        'alumni': 'alumnus', 'fungi': 'fungus', 'cacti': 'cactus',
-        'nuclei': 'nucleus', 'radii': 'radius', 'algae': 'alga',
-        'larvae': 'larva', 'nebulae': 'nebula', 'indices': 'index',
-        'matrices': 'matrix', 'appendices': 'appendix', 'vertices': 'vertex',
-        'data': 'datum', 'bacteria': 'bacterium', 'memoranda': 'memorandum',
-        'curricula': 'curriculum', 'genera': 'genus', 'corpora': 'corpus'
-    }
-    
-    if word in latin_mappings:
-        return latin_mappings[word], True
-    return word, False
-
-@lru_cache(maxsize=512)
-def _handle_ves_plurals(word: str) -> Tuple[str, bool]:
-    """Handle -ves plural forms."""
-    return (VES_MAPPING[word], True) if word in VES_MAPPING else (word, False)
 
 @lru_cache(maxsize=1024)
 def _handle_regular_plurals(word: str) -> str:
@@ -160,9 +138,7 @@ def _handle_regular_plurals(word: str) -> str:
     if word.endswith('ies'):
         return word[:-3] + 'y'
     elif word.endswith('es'):
-        if word.endswith(('ches', 'shes', 'ses', 'xes', 'zes')):
-            return word[:-2]
-        elif word.endswith('oes'):
+        if word.endswith(('ches', 'shes', 'ses', 'xes', 'zes', 'oes')):
             return word[:-2]
         return word[:-1]
     elif word.endswith('s') and not word.endswith('ss'):
@@ -176,7 +152,8 @@ def _handle_past_tense(word: str) -> str:
         return word[:-3] + 'y'
     elif word.endswith('ed'):
         stem = word[:-2]
-        if len(stem) >= 3 and stem[-1] == stem[-2] and stem[-1] in CONSONANTS:
+        if (len(stem) >= 3 and stem[-1] == stem[-2] and 
+            stem[-1] in CONSONANTS and stem not in KEEP_DOUBLE):
             return stem[:-1]
         elif stem.endswith('e'):
             return stem[:-1]
@@ -189,7 +166,8 @@ def _handle_past_tense(word: str) -> str:
 def _handle_gerund_forms(word: str) -> str:
     """Handle gerund (-ing) forms."""
     stem = word[:-3]
-    if len(stem) >= 3 and stem[-1] == stem[-2] and stem[-1] in CONSONANTS:
+    if (len(stem) >= 3 and stem[-1] == stem[-2] and 
+        stem[-1] in CONSONANTS and stem not in KEEP_DOUBLE):
         return stem[:-1]
     elif _count_syllables(stem) == 1 and _is_cvc_pattern(stem):
         return stem + 'e'
@@ -207,7 +185,7 @@ def _handle_able_ible_suffixes(word: str) -> str:
     elif stem.endswith('e'):
         return stem
     elif len(stem) >= 3:
-        if _is_cvc_pattern(stem) and stem in ['lik', 'liv', 'siz', 'writ']:
+        if _is_cvc_pattern(stem) and stem in ('lik', 'liv', 'siz', 'writ'):
             return stem + 'e'
         elif _count_syllables(stem) == 1:
             return stem + 'e'
@@ -222,123 +200,93 @@ def _handle_ness_suffix(word: str) -> str:
     stem = word[:-4]
     return stem[:-1] + 'y' if stem.endswith('i') else stem
 
-def _handle_ly_suffix(word: str) -> str:
-    """Handle -ly suffix."""
-    return word[:-3] + 'y' if word.endswith('ily') else word[:-2]
-
-def _handle_ful_suffix(word: str) -> str:
-    """Handle -ful suffix."""
-    return 'beauty' if word == 'beautiful' else word[:-3]
-
-def _handle_ant_ent_suffix(word: str) -> str:
-    """Handle -ant/-ent suffix."""
-    return word[:-3] + 'e' if len(word) > 5 else word
-
-def _handle_ic_ical_suffix(word: str) -> str:
-    """Handle -ic/-ical suffix."""
-    return word[:-4] if word.endswith('ical') else word[:-2]
-
-def _handle_ment_suffix(word: str) -> str:
-    """Handle -ment suffix."""
-    if word == 'government':
-        return 'govern'
-    stem = word[:-4]
-    return stem + 'e' if _count_syllables(stem) == 1 else stem
-
-def _handle_tion_sion_suffix(word: str) -> str:
-    """Handle -tion/-sion suffix."""
-    if word.endswith(('ation', 'ition')):
-        return word[:-3]
-    elif word.endswith(('tion', 'sion')):
-        stem = word[:-3]
-        return stem + 'e' if len(stem) > 2 else stem
-    return word
-
-def _handle_ance_ence_suffix(word: str) -> str:
-    """Handle -ance/-ence suffix."""
-    return word[:-4] + 'e'
-
-def _handle_ity_ety_suffix(word: str) -> str:
-    """Handle -ity/-ety suffix."""
-    stem = word[:-3]
-    if stem.endswith('al'):
-        stem = stem[:-2]
-    if stem.endswith('bil'):
-        stem = stem[:-2] + 'le'
-    elif stem.endswith('iv'):
-        stem = stem + 'e'
-    return stem
-
-def _handle_agent_suffix(word: str) -> str:
-    """Handle -er/-or suffix."""
-    if len(word) > 4 and not any(word.endswith(x) for x in ['eer', 'ier', 'yer', 'ger', 'ster']):
-        stem = word[:-2]
-        return stem + 'e' if _count_syllables(stem) == 1 else stem
-    return word
-
-def _handle_age_suffix(word: str) -> str:
-    """Handle -age suffix."""
-    if len(word) > 4:
-        stem = word[:-3]
-        return stem + 'e' if _count_syllables(stem) == 1 else stem
-    return word
-
-def _handle_base_verbs_suffix(word: str) -> str:
-    """Handle base verb endings."""
-    return word[:-3] if word.endswith('eth') else word
-
-PATTERN_HANDLERS = {
-    'ing': _handle_gerund_forms,
-    'past': _handle_past_tense,
-    'plural': _handle_regular_plurals,
-    'ly': _handle_ly_suffix,
-    'ness': _handle_ness_suffix,
-    'ment': _handle_ment_suffix,
-    'tion_sion': _handle_tion_sion_suffix,
-    'ance_ence': _handle_ance_ence_suffix,
-    'able_ible': _handle_able_ible_suffixes,
-    'ity_ety': _handle_ity_ety_suffix,
-    'ful': _handle_ful_suffix,
-    'ic_ical': _handle_ic_ical_suffix,
-    'ant_ent': _handle_ant_ent_suffix,
-    'agent': _handle_agent_suffix,
-    'age': _handle_age_suffix,
-    'base_verbs': _handle_base_verbs_suffix,
-    'eth': _handle_base_verbs_suffix,
-    'ous_ious': lambda word: word,
-    'directional': lambda word: word,
-    'ideology': lambda word: word,
-    'compound': lambda word: word[:-4]
-}
-
 @lru_cache(maxsize=2048)
 def _apply_rules(word: str) -> str:
-    """
-    Apply lemmatization rules to a word using optimized pattern matching.
+    """Apply lemmatization rules to a word using optimized pattern matching."""
     
-    This function uses a dispatch table for efficient pattern matching
-    instead of a long if-elif chain, improving performance significantly.
-    """
     if word in SPECIAL_CASES:
         return SPECIAL_CASES[word]
     
     if word in IRREGULAR_FORMS:
         return IRREGULAR_FORMS[word]
     
-    word, changed = _handle_latin_plurals(word)
-    if changed:
-        return word
+    if word in LATIN_MAPPING:
+        return LATIN_MAPPING[word]
     
-    word, changed = _handle_ves_plurals(word)
-    if changed:
-        return word
+    if word in VES_MAPPING:
+        return VES_MAPPING[word]
     
-    for pattern_name, pattern in PATTERNS.items():
-        if pattern.search(word):
-            handler = PATTERN_HANDLERS.get(pattern_name)
-            if handler:
-                return handler(word)
-            break
+    if word.endswith('ing'):
+        return _handle_gerund_forms(word)
+    
+    if word.endswith('ed') or word.endswith('d'):
+        if PATTERNS['past'].search(word):
+            return _handle_past_tense(word)
+    
+    if word.endswith(('ies', 'es', 's')):
+        if PATTERNS['plural'].search(word):
+            return _handle_regular_plurals(word)
+    
+    if word.endswith('ly'):
+        return word[:-3] + 'y' if word.endswith('ily') else word[:-2]
+    
+    if word.endswith('ness'):
+        return _handle_ness_suffix(word)
+    
+    if word.endswith('ment'):
+        if word == 'government':
+            return 'govern'
+        stem = word[:-4]
+        return stem + 'e' if _count_syllables(stem) == 1 else stem
+    
+    if word.endswith(('ation', 'ition')):
+        return word[:-3]
+    elif word.endswith(('tion', 'sion')):
+        stem = word[:-3]
+        return stem + 'e' if len(stem) > 2 else stem
+    
+    if word.endswith(('ance', 'ence')):
+        return word[:-4] + 'e'
+    
+    if word.endswith(('able', 'ible')):
+        return _handle_able_ible_suffixes(word)
+    
+    if word.endswith(('ity', 'ety')):
+        stem = word[:-3]
+        if stem.endswith('al'):
+            stem = stem[:-2]
+        if stem.endswith('bil'):
+            stem = stem[:-2] + 'le'
+        elif stem.endswith('iv'):
+            stem = stem + 'e'
+        return stem
+    
+    if word.endswith('ful'):
+        return 'beauty' if word == 'beautiful' else word[:-3]
+    
+    if word.endswith('ical'):
+        return word[:-4]
+    elif word.endswith('ic'):
+        return word[:-2]
+    
+    if word.endswith(('ant', 'ent')):
+        return word[:-3] + 'e' if len(word) > 5 else word
+    
+    if word.endswith(('er', 'or')):
+        if (len(word) > 4 and 
+            not any(word.endswith(x) for x in ('eer', 'ier', 'yer', 'ger', 'ster'))):
+            stem = word[:-2]
+            return stem + 'e' if _count_syllables(stem) == 1 else stem
+    
+    if word.endswith('age') and len(word) > 4:
+        stem = word[:-3]
+        return stem + 'e' if _count_syllables(stem) == 1 else stem
+    
+    if word.endswith(('hood', 'ship', 'dom')):
+        return word[:-4]
+    
+    if word.endswith('eth'):
+        return word[:-3]
     
     return word
 

@@ -1,7 +1,7 @@
 """
 Porter Stemmer implementation.
 """
-from typing import Dict, List, FrozenSet
+from typing import List, FrozenSet
 from functools import lru_cache
 
 VOWELS = frozenset('aeiou')
@@ -16,19 +16,10 @@ KEEP_AS_IS = frozenset([
 ])
 
 SPECIAL_CASES = {
-    'agreed': 'agree',
-    'dying': 'die',
-    'lying': 'lie',
-    'tying': 'tie',
-    'electriciti': 'electric',
-    'electrical': 'electric',
-    'engineering': 'engineer',
-    'controll': 'control',
-    'flying': 'fli',
-    'biology': 'biolog',
-    'physics': 'physic',
-    'chemistry': 'chemistri',
-    'mathematics': 'mathemat',
+    'agreed': 'agree', 'dying': 'die', 'lying': 'lie', 'tying': 'tie',
+    'electriciti': 'electric', 'electrical': 'electric', 'engineering': 'engineer',
+    'controll': 'control', 'flying': 'fli', 'biology': 'biolog',
+    'physics': 'physic', 'chemistry': 'chemistri', 'mathematics': 'mathemat',
     'psychology': 'psycholog'
 }
 
@@ -51,91 +42,58 @@ STEP4_SUFFIXES = (
     'al', 'er', 'ic', 'ou'
 )
 
-@lru_cache(maxsize=2048)
-def _is_vowel(char: str, word: str, index: int) -> bool:
-    """
-    Check if a character at the given index is a vowel.
-    
-    Args:
-        char: The character to check
-        word: The word containing the character
-        index: The position of the character in the word
-        
-    Returns:
-        True if the character is a vowel, False otherwise
-    """
-    char_lower = char.lower()
-    if char_lower in VOWELS:
-        return True
-    if char_lower == 'y':
-        return index == 0 or not _is_vowel(word[index - 1], word, index - 1)
-    return False
-
-@lru_cache(maxsize=2048)
-def _count_vc(word: str) -> int:
-    """
-    Count the number of vowel-consonant sequences.
-    
-    Args:
-        word: The word to analyze
-        
-    Returns:
-        The number of vowel-consonant sequences
-    """
-    count = 0
+@lru_cache(maxsize=4096)
+def _analyze_word(word: str) -> tuple:
+    """Analyze word structure and return vowel/consonant info and VC count."""
+    vc_count = 0
     is_prev_vowel = False
+    has_vowel = False
     
     for i, char in enumerate(word):
-        is_vowel = _is_vowel(char, word, i)
-        if not is_vowel and is_prev_vowel:
-            count += 1
+        char_lower = char.lower()
+        
+        if char_lower in VOWELS:
+            is_vowel = True
+        elif char_lower == 'y':
+            is_vowel = i == 0 or not is_prev_vowel
+        else:
+            is_vowel = False
+        
+        if is_vowel:
+            has_vowel = True
+        elif is_prev_vowel:
+            vc_count += 1
+            
         is_prev_vowel = is_vowel
     
-    return count
-
-@lru_cache(maxsize=1024)
-def _ends_cvc(word: str) -> bool:
-    """
-    Check if word ends in consonant-vowel-consonant sequence.
+    length = len(word)
+    ends_double_cons = (length >= 2 and 
+                       word[-2:].lower() in DOUBLE_CONSONANTS)
     
-    Args:
-        word: The word to check
-        
-    Returns:
-        True if the word ends in a CVC sequence, False otherwise
-    """
-    if len(word) < 3:
+    ends_cvc = (length >= 3 and 
+               not _is_vowel_at(word, length-1) and 
+               _is_vowel_at(word, length-2) and 
+               not _is_vowel_at(word, length-3) and
+               word[-1].lower() not in SPECIAL_CONS)
+    
+    return vc_count, has_vowel, ends_double_cons, ends_cvc
+
+@lru_cache(maxsize=2048)
+def _is_vowel_at(word: str, index: int) -> bool:
+    """Check if character at index is a vowel."""
+    if index < 0 or index >= len(word):
         return False
-    if not _is_vowel(word[-1], word, len(word)-1) and \
-       _is_vowel(word[-2], word, len(word)-2) and \
-       not _is_vowel(word[-3], word, len(word)-3):
-        return word[-1].lower() not in SPECIAL_CONS
-    return False
-
-@lru_cache(maxsize=1024)
-def _ends_double_consonant(word: str) -> bool:
-    """
-    Check if word ends in double consonant.
     
-    Args:
-        word: The word to check
-        
-    Returns:
-        True if the word ends in a double consonant, False otherwise
-    """
-    return len(word) >= 2 and word[-2:].lower() in DOUBLE_CONSONANTS
+    char = word[index].lower()
+    if char in VOWELS:
+        return True
+    if char == 'y':
+        return index == 0 or not _is_vowel_at(word, index - 1)
+    return False
 
 @lru_cache(maxsize=1024)
 def _step1a(word: str) -> str:
-    """
-    Step 1a of the Porter Stemming Algorithm.
-    
-    Args:
-        word: The word to stem
-        
-    Returns:
-        The word after applying step 1a rules
-    """
+    """Step 1a of the Porter Stemming Algorithm."""
     if word.endswith('sses'):
         return word[:-2]
     if word.endswith('ies'):
@@ -148,34 +106,24 @@ def _step1a(word: str) -> str:
 
 @lru_cache(maxsize=1024)
 def _step1b(word: str) -> str:
-    """
-    Step 1b of the Porter Stemming Algorithm.
-    
-    Args:
-        word: The word to stem
-        
-    Returns:
-        The word after applying step 1b rules
-    """
+    """Step 1b of the Porter Stemming Algorithm."""
     if word == 'agreed':
         return 'agree'
     
     if word.endswith('eed'):
-        if _count_vc(word[:-3]) > 0:
-            return word[:-1]
-        return word
+        stem = word[:-3]
+        vc_count, _, _, _ = _analyze_word(stem)
+        return word[:-1] if vc_count > 0 else word
     
     if word.endswith('ed'):
         stem = word[:-2]
-        if any(_is_vowel(char, stem, i) for i, char in enumerate(stem)):
-            return _post_process_stem(stem)
-        return word
+        _, has_vowel, _, _ = _analyze_word(stem)
+        return _post_process_stem(stem) if has_vowel else word
     
     if word.endswith('ing'):
         stem = word[:-3]
-        if any(_is_vowel(char, stem, i) for i, char in enumerate(stem)):
-            return _post_process_stem(stem)
-        return word
+        _, has_vowel, _, _ = _analyze_word(stem)
+        return _post_process_stem(stem) if has_vowel else word
     
     return word
 
@@ -184,61 +132,43 @@ def _post_process_stem(stem: str) -> str:
     """Post-process stem after removing -ed or -ing."""
     if stem.endswith(('at', 'bl', 'iz')):
         return stem + 'e'
-    if _ends_double_consonant(stem) and not stem.endswith(('l', 's', 'z')):
+    
+    vc_count, _, ends_double_cons, ends_cvc = _analyze_word(stem)
+    
+    if ends_double_cons and not stem.endswith(('l', 's', 'z')):
         return stem[:-1]
-    if _count_vc(stem) == 1 and _ends_cvc(stem):
+    
+    if vc_count == 1 and ends_cvc:
         return stem + 'e'
+    
     return stem
 
 @lru_cache(maxsize=1024)
 def _step1c(word: str) -> str:
-    """
-    Step 1c of the Porter Stemming Algorithm - handles Y to I transformation.
-    
-    Args:
-        word: The word to stem
-        
-    Returns:
-        The word after applying step 1c rules
-    """
+    """Step 1c of the Porter Stemming Algorithm - handles Y to I transformation."""
     if word in SPECIAL_CASES and (word.endswith('ing') or word.endswith('y')):
         return SPECIAL_CASES[word]
     
-    if word.endswith('y') and len(word) > 2 and \
-       any(_is_vowel(char, word, i) for i, char in enumerate(word[:-1])):
+    if (word.endswith('y') and len(word) > 2 and 
+        any(_is_vowel_at(word, i) for i in range(len(word)-1))):
         return word[:-1] + 'i'
     
     return word
 
 @lru_cache(maxsize=1024)
 def _step2(word: str) -> str:
-    """
-    Step 2 of the Porter Stemming Algorithm.
-    
-    Args:
-        word: The word to stem
-        
-    Returns:
-        The word after applying step 2 rules
-    """
+    """Step 2 of the Porter Stemming Algorithm."""
     for suffix, replacement in STEP2_REPLACEMENTS:
         if word.endswith(suffix):
             stem = word[:-len(suffix)]
-            if _count_vc(stem) > 0:
+            vc_count, _, _, _ = _analyze_word(stem)
+            if vc_count > 0:
                 return stem + replacement
     return word
 
 @lru_cache(maxsize=1024)
 def _step3(word: str) -> str:
-    """
-    Step 3 of the Porter Stemming Algorithm.
-    
-    Args:
-        word: The word to stem
-        
-    Returns:
-        The word after applying step 3 rules
-    """
+    """Step 3 of the Porter Stemming Algorithm."""
     if word in ('electriciti', 'electrical'):
         return 'electric'
     
@@ -248,28 +178,22 @@ def _step3(word: str) -> str:
     for suffix, replacement in STEP3_REPLACEMENTS:
         if word.endswith(suffix):
             stem = word[:-len(suffix)]
-            if _count_vc(stem) > 0:
+            vc_count, _, _, _ = _analyze_word(stem)
+            if vc_count > 0:
                 return stem + replacement
     return word
 
 @lru_cache(maxsize=1024)
 def _step4(word: str) -> str:
-    """
-    Step 4 of the Porter Stemming Algorithm.
-    
-    Args:
-        word: The word to stem
-        
-    Returns:
-        The word after applying step 4 rules
-    """
+    """Step 4 of the Porter Stemming Algorithm."""
     if word == 'engineering':
         return 'engineer'
     
     for suffix in STEP4_SUFFIXES:
         if word.endswith(suffix):
             stem = word[:-len(suffix)]
-            if _count_vc(stem) > 1:
+            vc_count, _, _, _ = _analyze_word(stem)
+            if vc_count > 1:
                 if suffix == 'ion' and not stem.endswith(('s', 't')):
                     continue
                 return stem
@@ -278,38 +202,23 @@ def _step4(word: str) -> str:
 
 @lru_cache(maxsize=1024)
 def _step5a(word: str) -> str:
-    """
-    Step 5a of the Porter Stemming Algorithm.
-    
-    Args:
-        word: The word to stem
-        
-    Returns:
-        The word after applying step 5a rules
-    """
+    """Step 5a of the Porter Stemming Algorithm."""
     if word.endswith('e'):
         stem = word[:-1]
-        if _count_vc(stem) > 1:
-            return stem
-        if _count_vc(stem) == 1 and not _ends_cvc(stem):
+        vc_count, _, _, ends_cvc = _analyze_word(stem)
+        if vc_count > 1 or (vc_count == 1 and not ends_cvc):
             return stem
     return word
 
 @lru_cache(maxsize=1024)
 def _step5b(word: str) -> str:
-    """
-    Step 5b of the Porter Stemming Algorithm.
-    
-    Args:
-        word: The word to stem
-        
-    Returns:
-        The word after applying step 5b rules
-    """
+    """Step 5b of the Porter Stemming Algorithm."""
     if word == 'controll':
         return 'control'
     
-    if _count_vc(word) > 1 and _ends_double_consonant(word) and word.endswith('l'):
+    vc_count, _, ends_double_cons, _ = _analyze_word(word)
+    
+    if vc_count > 1 and ends_double_cons and word.endswith('l'):
         return word[:-1]
     
     return word
@@ -411,15 +320,18 @@ def stem_batch(words: List[str]) -> List[str]:
         
         if word_lower in SPECIAL_CASES:
             results.append(SPECIAL_CASES[word_lower])
-        elif word_lower in KEEP_AS_IS:
-            results.append(word_lower)
-        elif len(word_lower) <= 2:
+        elif word_lower in KEEP_AS_IS or len(word_lower) <= 2:
             results.append(word_lower)
         else:
             processed_word = word_lower
-            steps = [_step1a, _step1b, _step1c, _step2, _step3, _step4, _step5a, _step5b]
-            for step in steps:
-                processed_word = step(processed_word)
+            processed_word = _step1a(processed_word)
+            processed_word = _step1b(processed_word)
+            processed_word = _step1c(processed_word)
+            processed_word = _step2(processed_word)
+            processed_word = _step3(processed_word)
+            processed_word = _step4(processed_word)
+            processed_word = _step5a(processed_word)
+            processed_word = _step5b(processed_word)
             results.append(processed_word)
     
     return results 
